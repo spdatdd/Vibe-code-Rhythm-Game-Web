@@ -1,0 +1,3 @@
+# Triển khai các tệp trình duyệt trực tiếp từ public/.
+[build]
+  publish = "public"

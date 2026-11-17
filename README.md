@@ -8,6 +8,15 @@ Nhấp đúp `Start-Game.cmd`, giữ cửa sổ server mở rồi truy cập **h
 Hoặc chạy `node server.mjs` trong thư mục dự án. Máy chủ chỉ lắng nghe trên máy hiện tại.
 Nếu vừa cập nhật server, tắt cửa sổ server cũ bằng Ctrl+C rồi chạy lại.
 
+## Chạy bản demo trên Netlify Free
+
+1. Trong Netlify, dùng team gói **Free** và đặt **Default project visibility** thành **Private for new projects** trước khi tạo dự án.
+2. Chọn **Add new project → Import an existing project → GitHub**. Cấp quyền cho Netlify đọc riêng repo `spdatdd/Vibe-code-Rhythm-Game-Web`.
+3. Chọn nhánh `deverlop1`. Để trống **Base directory** và **Build command**. **Publish directory** là `public`, đã khai báo trong `netlify.toml` ở thư mục gốc.
+4. Deploy, kiểm tra **Project configuration → General → Visitor access → Project visibility** để bảo đảm bản deploy ở chế độ **Private**. Trên Free theo credit, đăng nhập bằng tài khoản Team Owner để chơi.
+
+Bản Netlify chạy nhạc demo và các điều khiển bàn phím, chuột, cảm ứng. Chức năng phân tích YouTube cần máy chủ Node.js/Python của dự án, được mở qua `Start-Game.cmd` trên máy tính. Chỉ thư mục `public` được triển khai lên Netlify.
+
 ## Tự phân tích YouTube
 
 1. Chọn **YouTube** và dán link. Sau khoảng một giây game tự bắt đầu chuẩn bị; cũng có thể bấm **Phân tích**.

@@ -39,6 +39,10 @@ const server = http.createServer(async (req, res) => {
     const pathname = decodeURIComponent(new URL(req.url, `http://${host}`).pathname);
     if (pathname.startsWith('/api/')) {
       if ((req.headers.origin && req.headers.origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site') { json(res, 403, { error: 'Chỉ cho phép cùng nguồn.' }); return; }
+      // Cho giao diện biết máy chủ hiện tại có hỗ trợ phân tích YouTube.
+      if (pathname === '/api/capabilities' && req.method === 'GET') {
+        json(res, 200, { youtubeAnalysis: true }); return;
+      }
       if (pathname === '/api/prepare' && req.method === 'POST') {
         if (!req.headers['content-type']?.startsWith('application/json')) { json(res, 415, { error: 'Cần Content-Type application/json.' }); return; }
         const input = await body(req), id = videoId(String(input.url || ''));

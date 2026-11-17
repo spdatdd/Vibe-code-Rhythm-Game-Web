@@ -11,6 +11,7 @@ const laneEffects = new Map();
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let source = 'demo', loadedId = '', prepared = null, musicBuffer = null, musicSource = null;
+let analysisAvailable = false;
 let prepareVersion = 0, prepareAbort = null, pasteTimer = null;
 let mode = 'idle', chart = [], settings, stats, audio, anchor = 0, elapsed = 0;
 let lastTime = 0, lastBeat = -1, pendingHold = null, feedback = '', feedbackUntil = 0;
@@ -50,6 +51,7 @@ function setMode(next) {
   const active = ['playing', 'paused', 'waiting'].includes(mode), preparing = mode === 'preparing';
   $('settings').disabled = active || preparing;
   for (const id of ['demo-tab', 'youtube-tab', 'load-video', 'video-url', 'reset']) $(id).disabled = active || preparing;
+  $('youtube-tab').disabled ||= !analysisAvailable;
   for (const id of ['bpm', 'offset', 'duration', 'tap']) $(id).disabled = source === 'youtube';
   $('start').disabled = active || preparing || (source === 'youtube' && (!prepared || !musicBuffer));
   $('restart').disabled = preparing || mode === 'waiting' || (source === 'youtube' && (!prepared || !musicBuffer));
@@ -273,6 +275,7 @@ async function cancelPreparation() {
 }
 // Chuyển giữa nhạc demo và bài YouTube đã chuẩn bị; không để hai nguồn phát chồng nhau.
 function selectSource(next) {
+  if (next === 'youtube' && !analysisAvailable) return;
   if (['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
   clearTimeout(pasteTimer); source = next; stopMusic(); stopSounds();
   $('demo-tab').classList.toggle('selected', next === 'demo'); $('youtube-tab').classList.toggle('selected', next === 'youtube');
@@ -473,4 +476,17 @@ try {
     $('latency-value').textContent = `${$('latency').value} ms`;
   }
 } catch {}
+// Bật phân tích YouTube khi máy chủ xác nhận hỗ trợ; bản web tĩnh chỉ mở demo.
+async function checkAnalysisSupport() {
+  try {
+    const response = await fetch('/api/capabilities', { signal: AbortSignal.timeout(5000) });
+    analysisAvailable = response.ok && (await response.json()).youtubeAnalysis === true;
+  } catch {
+    analysisAvailable = false;
+  }
+  $('analysis-unavailable').hidden = analysisAvailable;
+  $('youtube-tab').disabled = !analysisAvailable || ['playing', 'paused', 'waiting', 'preparing'].includes(mode);
+}
+
 resetRound(); setMode('idle'); requestAnimationFrame(frame);
+void checkAnalysisSupport();
