@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ORBIT — Rhythm Lab</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<!-- Thanh thương hiệu và trạng thái của phòng thực hành rhythm. -->
+<header><a class="brand" href="/">◉ <strong>ORBIT<span> / RHYTHM LAB</span></strong></a><div class="local"><i></i> LOCAL PLAYGROUND <span>V.01</span></div></header>
+<main>
+<section class="intro"><div><p class="eyebrow">FEEL THE SOUND. FIND YOUR ORBIT.</p><h1>Đưa âm nhạc vào <em>quỹ đạo.</em></h1><p>Bốn cột phím đàn. Những ô nhạc rơi. Chạm đúng nhịp.</p></div><div class="edition">01 <span>EXPERIMENTAL<br>RHYTHM EXPERIENCE</span></div></section>
+<div class="layout">
+<!-- Sân chơi canvas, bảng điểm và các nút điều khiển trận đấu. -->
+<section class="arena-panel"><div class="arena-top"><span><i class="dot"></i> <b id="mode-label">NEON DRIFT</b> <small id="source-label">/ DEMO ORIGINAL</small></span><span id="phase">SẴN SÀNG</span></div>
+<div class="stats"><div><small>ĐIỂM SỐ</small><strong id="score">000000</strong></div><div><small>COMBO</small><strong id="combo">0<span>×</span></strong></div><div><small>CHÍNH XÁC</small><strong id="accuracy">—</strong></div></div>
+<div class="stage" tabindex="0" aria-label="Sân chơi Piano Tiles. Bấm D F J K hoặc chạm bốn cột theo nhịp."><canvas id="arena"></canvas><div id="center-message"><span>ĐI THEO ÂM NHẠC</span><strong>Sẵn sàng vào nhịp?</strong><p>Bấm <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> hoặc chạm cột</p></div><div class="stage-bottom"><span>♪ PIANO TILES</span><span id="clock">00:00 / 00:48</span></div></div>
+<div class="timeline"><div id="progress"></div></div><div class="transport"><button id="start" class="primary">▶ &nbsp; Bắt đầu chơi</button><button id="pause" disabled>Tạm dừng</button><button id="stop" disabled>Dừng lượt</button><button id="restart" title="Chơi lại từ đầu">↻ Chơi lại</button><span id="note-count">84 NỐT</span></div>
+<div id="status" role="status">Nhạc demo đã sẵn sàng. Đeo tai nghe để cảm nhận nhịp tốt hơn.</div>
+</section>
+<!-- Thiết lập nguồn nhạc và bản đồ nhịp, có thể lưu trên trình duyệt. -->
+<aside><section class="card"><div class="card-title"><h2>Nguồn âm nhạc</h2><span>01</span></div><div class="tabs"><button id="demo-tab" class="selected">◉ &nbsp; Nhạc demo</button><button id="youtube-tab">▷ &nbsp; YouTube</button></div><div id="demo-panel"><div class="cover"><div class="vinyl"></div><span>ORBIT<br><b>NEON<br>DRIFT</b><small>ORIGINAL SYNTH LOOP / 120 BPM</small></span></div><div class="track-info"><strong>Neon Drift</strong><span>Âm thanh tổng hợp · 48 giây</span></div></div><div id="youtube-panel" hidden>
+<label for="video-url">Dán link YouTube để tự phân tích</label>
+<div class="input-row"><input id="video-url" placeholder="https://youtube.com/watch?v=…"><button id="load-video">Phân tích</button></div>
+<p class="hint">Chuẩn bị một lần trước khi chơi. Hỗ trợ bài nhạc tối đa 10 phút; lần đầu có thể mất vài phút.</p>
+<!-- Tiến độ phản ánh các giai đoạn thực tế, không dùng thời gian giả lập. -->
+<div id="analysis-panel" hidden><div class="analysis-steps">01 TẢI NHẠC → 02 PHÂN TÍCH → 03 SẴN SÀNG</div><progress id="analysis-progress" max="100" value="0" aria-label="Tiến độ chuẩn bị bài nhạc"></progress><p id="analysis-message" role="status"></p><button id="cancel-prepare" hidden>Hủy chuẩn bị</button></div>
+<strong id="track-title"></strong><a id="original-video" hidden target="_blank" rel="noopener noreferrer">Xem video gốc trên YouTube ↗</a>
+<p class="hint">Khi chơi, âm thanh đã tải được phát trên máy và dùng cùng đồng hồ với nốt. Không cần tự nhập BPM hoặc gõ căn nhịp.</p>
+</div></section>
+<section class="card"><div class="card-title"><h2>Thiết lập nhịp</h2><span>02</span></div><fieldset id="settings"><div class="fields"><label>BPM<input id="bpm" type="number" min="40" max="240" step="0.001" value="120"></label><label>Mốc nhịp (demo)<input id="offset" type="number" min="0" max="3600" step="0.0001" value="2"></label></div><div class="fields"><label>Độ dài (giây)<input id="duration" type="number" min="15" max="600" value="48"></label><label>Độ khó<select id="difficulty"><option value="easy">Dễ · làm quen</option><option value="normal" selected>Vừa · phiêu nhạc</option><option value="hard">Khó · thử thách</option></select></label></div><div class="range-label"><label for="latency">Bù độ trễ</label><output id="latency-value">0 ms</output></div><input id="latency" type="range" min="-300" max="300" step="5" value="0"><p class="hint">YouTube: nốt được tạo từ âm thanh, BPM chỉ để tham khảo. Bù trễ dương làm nốt tới muộn hơn, âm làm nốt tới sớm hơn nếu tai nghe có độ trễ.</p><button id="tap" class="wide">♪ Tap tempo cho demo <span>YouTube được phân tích tự động</span></button></fieldset><div class="save-row"><button id="save">↓ Lưu thiết lập</button><button id="reset">Khôi phục</button></div></section></aside>
+</div>
+<section class="instructions"><div><span class="step">01</span><div><h3>Bốn cột phím đàn</h3><p>Bấm <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> từ trái sang phải, hoặc chạm trực tiếp vào cột.</p></div></div><div><span class="step">02</span><div><h3>Chạm đúng nhịp</h3><p>Bấm khi đáy ô tới vạch sáng. Ô dài: giữ phím hoặc ngón tay đến hết đuôi.</p></div></div><div><span class="step">03</span><div><h3>Tìm dòng chảy</h3><p>Trượt ô hoặc bấm ô trống sẽ mất combo. <kbd>Esc</kbd> để tạm dừng và nghỉ một chút.</p></div></div></section>
+<footer><span>ORBIT LAB © 2026</span><span>Piano Tiles · Bốn cột theo nhịp · Dành cho học tập</span><span>BUILT TO FEEL.</span></footer>
+</main><script type="module" src="app.js"></script></body></html>
