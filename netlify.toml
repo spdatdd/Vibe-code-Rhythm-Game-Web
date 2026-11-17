@@ -1,3 +1,8 @@
-# Triển khai các tệp trình duyệt trực tiếp từ public/.
+# Phục vụ giao diện tĩnh và chạy proxy API bằng Node 24.
 [build]
   publish = "public"
+  [build.environment]
+    NODE_VERSION = "24"
+
+[server]
+  path = "/api/*"

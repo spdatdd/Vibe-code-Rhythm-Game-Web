@@ -8,14 +8,17 @@ Nhấp đúp `Start-Game.cmd`, giữ cửa sổ server mở rồi truy cập **h
 Hoặc chạy `node server.mjs` trong thư mục dự án. Máy chủ chỉ lắng nghe trên máy hiện tại.
 Nếu vừa cập nhật server, tắt cửa sổ server cũ bằng Ctrl+C rồi chạy lại.
 
-## Chạy bản demo trên Netlify Free
+## Chạy cả game và phân tích YouTube với Netlify và Render
 
-1. Trong Netlify, dùng team gói **Free** và đặt **Default project visibility** thành **Private for new projects** trước khi tạo dự án.
-2. Chọn **Add new project → Import an existing project → GitHub**. Cấp quyền cho Netlify đọc riêng repo `spdatdd/Vibe-code-Rhythm-Game-Web`.
-3. Chọn nhánh `deverlop1`. Để trống **Base directory** và **Build command**. **Publish directory** là `public`, đã khai báo trong `netlify.toml` ở thư mục gốc.
-4. Deploy, kiểm tra **Project configuration → General → Visitor access → Project visibility** để bảo đảm bản deploy ở chế độ **Private**. Trên Free theo credit, đăng nhập bằng tài khoản Team Owner để chơi.
+**Render Free** chạy Node.js, Python và FFmpeg trong Docker. **Netlify Free theo credit** phục vụ giao diện và chuyển các yêu cầu `/api/*` tới Render qua Netlify Server. Repo GitHub có thể giữ riêng tư.
 
-Bản Netlify chạy nhạc demo và các điều khiển bàn phím, chuột, cảm ứng. Chức năng phân tích YouTube cần máy chủ Node.js/Python của dự án, được mở qua `Start-Game.cmd` trên máy tính. Chỉ thư mục `public` được triển khai lên Netlify.
+1. Trên [Render Dashboard](https://dashboard.render.com/), chọn **New → Blueprint**. Kết nối repo `spdatdd/Vibe-code-Rhythm-Game-Web`, chọn nhánh `deverlop1` và dùng `render.yaml`. Blueprint tạo một Docker Web Service gói **Free** và tạo ngẫu nhiên khóa `ORBIT_BACKEND_SECRET`.
+2. Khi Render báo **Live**, lưu URL HTTPS dạng `https://ten-dich-vu.onrender.com`. Trong phần **Environment** của dịch vụ, lấy giá trị `ORBIT_BACKEND_SECRET` để nhập trực tiếp vào Netlify.
+3. Trong Netlify, dùng team **Free** theo credit với mặc định **Private for new projects**. Import cùng repo và nhánh `deverlop1`, hoặc mở dự án hiện có. Để trống **Base directory** và **Build command**. `netlify.toml` đã đặt thư mục xuất bản `public` và Node 24.
+4. Trong **Project configuration → Environment variables**, đặt `ORBIT_BACKEND_URL` bằng URL Render và `ORBIT_BACKEND_SECRET` bằng khóa ở bước 2. Đặt phạm vi **Functions** nếu giao diện cho phép chọn. Giữ khóa trong biến môi trường và bật **Private** cho cả production lẫn preview tại **Visitor access → Project visibility**.
+5. Deploy lại Netlify sau khi lưu biến. Đăng nhập với tư cách Team Owner, mở game, chọn **YouTube** rồi thử dán một link công khai. Khi chuẩn bị xong, bấm **Bắt đầu chơi**.
+
+Render Free ngủ sau 15 phút không có lưu lượng. Lần đầu dán link sau khi ngủ có thể chờ khoảng một phút để server thức dậy. Cache bài mất khi Render ngủ, khởi động lại hoặc deploy. YouTube có thể chặn tải từ IP máy chủ hoặc yêu cầu xác minh. Kiểm tra bằng link thật sau khi deploy để biết backend Render có tải được. Nếu thiếu biến môi trường, Netlify chạy ở chế độ demo. Tài liệu [Render Free](https://render.com/docs/free), [Netlify Server](https://docs.netlify.com/build/server/) và [Netlify Project Visibility](https://docs.netlify.com/manage/security/secure-access-to-sites/project-visibility/).
 
 ## Tự phân tích YouTube
 

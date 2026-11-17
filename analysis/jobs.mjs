@@ -49,7 +49,8 @@ export async function startJob(id) {
     const python = await pythonPath();
     if (job.stage === 'cancelled') { running = null; return job; }
     const child = spawn(python, [path.join(root, 'analysis', 'prepare.py'), '--id', id, '--output', path.join(cacheRoot, id), '--node', process.execPath], {
-      cwd: root, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1',
+      cwd: root, windowsHide: true, detached: process.platform !== 'win32',
+      env: { ...process.env, ORBIT_BACKEND_SECRET: '', PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1',
         PYTHONPATH: path.join(root, '.tools', 'python'), NUMBA_CACHE_DIR: path.join(root, '.cache', 'numba') }, stdio: ['ignore', 'pipe', 'pipe']
     });
     running.child = child;
@@ -92,7 +93,10 @@ export function cancelJob(id, stage = 'cancelled') {
       const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
       // Dừng trực tiếp nếu hệ thống không cung cấp lệnh taskkill.
       killer.on('error', () => child.kill());
-    } else child.kill('SIGTERM');
+    } else {
+      // Python và FFmpeg nằm chung nhóm tiến trình trên Linux.
+      try { process.kill(-child.pid, 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') child.kill('SIGTERM'); }
+    }
   }
   return true;
 }

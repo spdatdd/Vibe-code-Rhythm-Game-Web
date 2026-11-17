@@ -202,7 +202,11 @@ function strike(lane) {
 async function requestJson(url, options = {}) {
   const response = await fetch(url, { ...options, signal: prepareAbort?.signal });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Máy chủ không xử lý được yêu cầu.');
+  if (!response.ok) {
+    const error = new Error(data.error || 'Máy chủ không xử lý được yêu cầu.');
+    error.code = data.code;
+    throw error;
+  }
   return data;
 }
 // Hiển thị tiến độ tải, phân tích và giải mã trước khi cho phép bắt đầu.
@@ -213,14 +217,30 @@ function showPreparation(progress, message) {
   status(message);
 }
 // Chờ giữa các lần kiểm tra tiến độ, có thể hủy ngay khi người dùng nhấn Hủy.
-function pollDelay(signal) {
+function pollDelay(signal, milliseconds = 700) {
   return new Promise((resolveDelay, reject) => {
-    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolveDelay(); }, 700);
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolveDelay(); }, milliseconds);
     // Hủy bộ đếm chờ để không chạy tiếp tác vụ cũ.
     function abort() { clearTimeout(timer); reject(new DOMException('Đã hủy', 'AbortError')); }
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
   });
+}
+// Thử lại khi host Free đang thức dậy; gửi cùng ID nên server có thể dùng lại tác vụ.
+async function startPreparation(id, signal) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestJson('/api/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: id }),
+      });
+    } catch (error) {
+      if (error.code !== 'BACKEND_STARTING' || attempt >= 7) throw error;
+      showPreparation(1, 'Đang đánh thức máy chủ phân tích. Lần đầu có thể mất khoảng một phút…');
+      await pollDelay(signal, 3000);
+    }
+  }
 }
 // Tải và phân tích bài hát rồi giải mã chính tệp PCM đó thành AudioBuffer để phát đồng bộ.
 async function loadVideo() {
@@ -234,7 +254,7 @@ async function loadVideo() {
   setMode('preparing'); resetRound(); center('Đang chuẩn bị bài nhạc…', 'Chỉ bắt đầu khi âm thanh và bản đồ nốt đã sẵn sàng.');
   showPreparation(1, 'Đang gửi bài nhạc tới công cụ phân tích…');
   try {
-    let job = await requestJson('/api/prepare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: id }) });
+    let job = await startPreparation(id, prepareAbort.signal);
     while (version === prepareVersion && job.stage !== 'ready') {
       if (['error', 'cancelled'].includes(job.stage)) throw new Error(job.message);
       showPreparation(job.progress * .9, job.message);

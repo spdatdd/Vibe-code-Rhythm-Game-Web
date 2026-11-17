@@ -19,7 +19,9 @@ class AnalysisTests(unittest.TestCase):
         """Các nốt piano tổng hợp đổi tốc độ vẫn phải có onset gần thời điểm gốc."""
         sr = 44100
         times = [.7, 1.2, 1.7, 2.2, 2.65, 3.05, 3.4, 3.72, 4.03, 4.31, 4.59, 4.89, 5.22, 5.6, 6.1, 6.7]
-        y = np.zeros(sr * 8, dtype=np.float32)
+        # Đặt thêm nốt sát ranh giới giữa hai đoạn phân tích (khoảng 17,833 giây).
+        times += [17.63, 17.84, 18.12, 18.55, 19.11]
+        y = np.zeros(sr * 20, dtype=np.float32)
         for i, onset in enumerate(times):
             t = np.arange(int(sr * .22)) / sr
             attack = np.minimum(1, t / .004) * np.exp(-t * 18)
@@ -33,7 +35,7 @@ class AnalysisTests(unittest.TestCase):
         found = [event['time'] for event in result['events']]
         errors = [min(abs(point - onset) for point in found) for onset in times]
         self.assertLess(max(errors), .065)
-        self.assertAlmostEqual(result['duration'], 8, places=3)
+        self.assertAlmostEqual(result['duration'], 20, places=3)
 
     def test_silence(self):
         """Từ chối file im lặng thay vì tạo bản đồ nốt giả từ một BPM mặc định."""
