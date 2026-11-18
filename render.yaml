@@ -1,0 +1,14 @@
+# Chạy bộ phân tích trong một web service Docker gói Free.
+services:
+  - type: web
+    name: orbit-rhythm-analysis
+    runtime: docker
+    plan: free
+    branch: deverlop1
+    healthCheckPath: /healthz
+    envVars:
+      - key: ORBIT_HOSTED
+        value: "1"
+      # Render tạo khóa. Dùng cùng giá trị trong biến môi trường của Netlify.
+      - key: ORBIT_BACKEND_SECRET
+        generateValue: true

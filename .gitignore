@@ -2,3 +2,5 @@
 .cache/
 *.log
 __pycache__/
+.netlify/
+.env*

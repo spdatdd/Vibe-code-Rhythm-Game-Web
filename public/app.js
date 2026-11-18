@@ -11,6 +11,7 @@ const laneEffects = new Map();
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let source = 'demo', loadedId = '', prepared = null, musicBuffer = null, musicSource = null;
+let analysisAvailable = false;
 let prepareVersion = 0, prepareAbort = null, pasteTimer = null;
 let mode = 'idle', chart = [], settings, stats, audio, anchor = 0, elapsed = 0;
 let lastTime = 0, lastBeat = -1, pendingHold = null, feedback = '', feedbackUntil = 0;
@@ -50,6 +51,7 @@ function setMode(next) {
   const active = ['playing', 'paused', 'waiting'].includes(mode), preparing = mode === 'preparing';
   $('settings').disabled = active || preparing;
   for (const id of ['demo-tab', 'youtube-tab', 'load-video', 'video-url', 'reset']) $(id).disabled = active || preparing;
+  $('youtube-tab').disabled ||= !analysisAvailable;
   for (const id of ['bpm', 'offset', 'duration', 'tap']) $(id).disabled = source === 'youtube';
   $('start').disabled = active || preparing || (source === 'youtube' && (!prepared || !musicBuffer));
   $('restart').disabled = preparing || mode === 'waiting' || (source === 'youtube' && (!prepared || !musicBuffer));
@@ -200,7 +202,11 @@ function strike(lane) {
 async function requestJson(url, options = {}) {
   const response = await fetch(url, { ...options, signal: prepareAbort?.signal });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Máy chủ không xử lý được yêu cầu.');
+  if (!response.ok) {
+    const error = new Error(data.error || 'Máy chủ không xử lý được yêu cầu.');
+    error.code = data.code;
+    throw error;
+  }
   return data;
 }
 // Hiển thị tiến độ tải, phân tích và giải mã trước khi cho phép bắt đầu.
@@ -211,14 +217,30 @@ function showPreparation(progress, message) {
   status(message);
 }
 // Chờ giữa các lần kiểm tra tiến độ, có thể hủy ngay khi người dùng nhấn Hủy.
-function pollDelay(signal) {
+function pollDelay(signal, milliseconds = 700) {
   return new Promise((resolveDelay, reject) => {
-    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolveDelay(); }, 700);
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolveDelay(); }, milliseconds);
     // Hủy bộ đếm chờ để không chạy tiếp tác vụ cũ.
     function abort() { clearTimeout(timer); reject(new DOMException('Đã hủy', 'AbortError')); }
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
   });
+}
+// Thử lại khi host Free đang thức dậy; gửi cùng ID nên server có thể dùng lại tác vụ.
+async function startPreparation(id, signal) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestJson('/api/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: id }),
+      });
+    } catch (error) {
+      if (error.code !== 'BACKEND_STARTING' || attempt >= 7) throw error;
+      showPreparation(1, 'Đang đánh thức máy chủ phân tích. Lần đầu có thể mất khoảng một phút…');
+      await pollDelay(signal, 3000);
+    }
+  }
 }
 // Tải và phân tích bài hát rồi giải mã chính tệp PCM đó thành AudioBuffer để phát đồng bộ.
 async function loadVideo() {
@@ -232,7 +254,7 @@ async function loadVideo() {
   setMode('preparing'); resetRound(); center('Đang chuẩn bị bài nhạc…', 'Chỉ bắt đầu khi âm thanh và bản đồ nốt đã sẵn sàng.');
   showPreparation(1, 'Đang gửi bài nhạc tới công cụ phân tích…');
   try {
-    let job = await requestJson('/api/prepare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: id }) });
+    let job = await startPreparation(id, prepareAbort.signal);
     while (version === prepareVersion && job.stage !== 'ready') {
       if (['error', 'cancelled'].includes(job.stage)) throw new Error(job.message);
       showPreparation(job.progress * .9, job.message);
@@ -273,6 +295,7 @@ async function cancelPreparation() {
 }
 // Chuyển giữa nhạc demo và bài YouTube đã chuẩn bị; không để hai nguồn phát chồng nhau.
 function selectSource(next) {
+  if (next === 'youtube' && !analysisAvailable) return;
   if (['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
   clearTimeout(pasteTimer); source = next; stopMusic(); stopSounds();
   $('demo-tab').classList.toggle('selected', next === 'demo'); $('youtube-tab').classList.toggle('selected', next === 'youtube');
@@ -473,4 +496,17 @@ try {
     $('latency-value').textContent = `${$('latency').value} ms`;
   }
 } catch {}
+// Bật phân tích YouTube khi máy chủ xác nhận hỗ trợ; bản web tĩnh chỉ mở demo.
+async function checkAnalysisSupport() {
+  try {
+    const response = await fetch('/api/capabilities', { signal: AbortSignal.timeout(5000) });
+    analysisAvailable = response.ok && (await response.json()).youtubeAnalysis === true;
+  } catch {
+    analysisAvailable = false;
+  }
+  $('analysis-unavailable').hidden = analysisAvailable;
+  $('youtube-tab').disabled = !analysisAvailable || ['playing', 'paused', 'waiting', 'preparing'].includes(mode);
+}
+
 resetRound(); setMode('idle'); requestAnimationFrame(frame);
+void checkAnalysisSupport();

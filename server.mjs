@@ -1,12 +1,16 @@
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
+import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { videoId } from './public/engine.js';
 import { startJob, getJob, cancelJob, cachedResult, cacheRoot } from './analysis/jobs.mjs';
 const root = path.resolve(fileURLToPath(new URL('./public/', import.meta.url)));
 const port = process.env.PORT || '5173';
+const hosted = process.env.ORBIT_HOSTED === '1';
+const backendSecret = Buffer.from(process.env.ORBIT_BACKEND_SECRET || '');
+if (hosted && backendSecret.length < 32) throw new Error('ORBIT_BACKEND_SECRET cần có ít nhất 32 ký tự.');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 // Trả JSON nhất quán cho tiến độ, kết quả và lỗi.
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); }
@@ -35,13 +39,26 @@ async function serveAudio(req, res, file) {
 const server = http.createServer(async (req, res) => {
   try {
     const host = req.headers.host;
-    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(host)) { json(res, 403, { error: 'Host không được phép.' }); return; }
-    const pathname = decodeURIComponent(new URL(req.url, `http://${host}`).pathname);
+    const origin = `http://${host}`;
+    const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    if (hosted) {
+      // Chỉ công khai dấu hiệu tiến trình còn hoạt động cho kiểm tra sức khỏe của Render.
+      if (pathname === '/healthz' && req.method === 'GET') { json(res, 200, { ok: true }); return; }
+      const supplied = Buffer.from(req.headers['x-orbit-backend-key'] || '');
+      if (!pathname.startsWith('/api/') || supplied.length !== backendSecret.length ||
+          !timingSafeEqual(supplied, backendSecret)) { json(res, 403, { error: 'Truy cập bị từ chối.' }); return; }
+    } else if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(host)) {
+      json(res, 403, { error: 'Host không được phép.' }); return;
+    }
     if (pathname.startsWith('/api/')) {
-      if ((req.headers.origin && req.headers.origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site') { json(res, 403, { error: 'Chỉ cho phép cùng nguồn.' }); return; }
+      if (!hosted && ((req.headers.origin && req.headers.origin !== origin) || req.headers['sec-fetch-site'] === 'cross-site')) { json(res, 403, { error: 'Chỉ cho phép cùng nguồn.' }); return; }
+      // Cho giao diện biết máy chủ hiện tại có hỗ trợ phân tích YouTube.
+      if (pathname === '/api/capabilities' && req.method === 'GET') {
+        json(res, 200, { youtubeAnalysis: true }); return;
+      }
       if (pathname === '/api/prepare' && req.method === 'POST') {
         if (!req.headers['content-type']?.startsWith('application/json')) { json(res, 415, { error: 'Cần Content-Type application/json.' }); return; }
-        const input = await body(req), id = videoId(String(input.url || ''));
+        const input = await body(req), id = videoId(typeof input?.url === 'string' ? input.url : '');
         if (!id) { json(res, 400, { error: 'Link YouTube không hợp lệ.' }); return; }
         json(res, 202, await startJob(id)); return;
       }
@@ -68,7 +85,8 @@ const server = http.createServer(async (req, res) => {
     json(res, error.status || (error.code === 'ENOENT' ? 404 : 500), { error: error.status ? error.message : 'Không xử lý được yêu cầu. Hãy thử lại.' });
   }
 });
-// Chỉ mở máy chủ trên loopback; không công bố game ra mạng LAN.
-server.listen(Number(port), '127.0.0.1', () => console.log(`Orbit Rhythm: http://127.0.0.1:${port}`));
+// Bản cục bộ nghe loopback; bản Render nhận kết nối của proxy trên cổng được cấp.
+const bindAddress = hosted ? '0.0.0.0' : '127.0.0.1';
+server.listen(Number(port), bindAddress, () => console.log(`Orbit Rhythm: http://${bindAddress}:${port}`));
 // Báo lỗi cổng đang dùng bằng hướng dẫn dễ hiểu.
 server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? 'Game đang chạy ở cổng này. Tắt cửa sổ server cũ trước khi chạy lại.' : error.message); process.exitCode = 1; });
