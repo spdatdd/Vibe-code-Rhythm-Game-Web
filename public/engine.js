@@ -43,9 +43,9 @@ export function calculateRank(accuracy, failed = false) {
 
 // Tạo chart từ onset thật, chọn nốt nổi bật theo độ khó và ưu tiên nốt khớp phách.
 export function buildAnalyzedChart(events, difficulty, duration, { allowChords = false } = {}) {
-  const gap = { easy: .42, normal: .25, hard: .14 }[difficulty] || .25;
-  const threshold = { easy: .30, normal: .12, hard: .035 }[difficulty] || .12;
-  const minHold = { easy: .58, normal: .42, hard: .32 }[difficulty] || .42;
+  const gap = { normal: .25, hard: .14 }[difficulty] || .25;
+  const threshold = { normal: .12, hard: .035 }[difficulty] || .12;
+  const minHold = { normal: .42, hard: .32 }[difficulty] || .42;
   const candidates = events.filter(event => Number.isFinite(event.time) && event.time >= 0 && event.time < duration - .1 && event.strength >= threshold);
   const selected = [];
   const priority = event => event.strength * (0.65 + 0.35 * (Number.isFinite(event.beatScore) ? event.beatScore : 0));
@@ -103,7 +103,7 @@ export function videoId(input) {
 // Sinh bản đồ nốt xác định theo BPM; chừa khoảng trống sau nốt giữ.
 export function makeChart({ bpm, offset, duration, difficulty }) {
   const beat = 60 / bpm;
-  const step = beat * (difficulty === 'easy' ? 2 : difficulty === 'hard' ? .5 : 1);
+  const step = beat * (difficulty === 'hard' ? .5 : 1);
   const notes = [];
   // Bỏ qua các phách quá sớm nhưng giữ nguyên pha của mốc nhịp người dùng chọn.
   const first = Math.max(0, Math.ceil((2 - offset) / step - 1e-9));

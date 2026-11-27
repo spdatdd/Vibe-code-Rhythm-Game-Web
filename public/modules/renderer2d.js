@@ -1,12 +1,12 @@
 const PIXELS_PER_SECOND = 460;
-const NOTE_HEIGHT = 88;
+const NOTE_HEIGHT = 114;
 
 /** Tính khung 4 cột Piano Tiles 2D căn giữa theo kích thước màn hình. */
 export function getLayout2D(width, height) {
   const boardWidth = Math.min(Math.max(width - 16, 220), 520);
   const left = (width - boardWidth) / 2;
   const laneWidth = boardWidth / 4;
-  const hitY = Math.max(120, height - 92);
+  const hitY = Math.max(120, height - 124);
   return { width, height, left, boardWidth, laneWidth, hitY };
 }
 
@@ -74,7 +74,7 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
     }
 
     const padTop = hitY + 10;
-    const padHeight = Math.max(46, Math.min(70, h - padTop - 12));
+    const padHeight = Math.max(60, Math.min(102, h - padTop - 12));
     const holdingLanes = new Set();
 
     // Các khối nốt rơi thẳng từ trên xuống vạch đánh.

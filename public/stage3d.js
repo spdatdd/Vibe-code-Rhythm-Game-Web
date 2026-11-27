@@ -4,8 +4,8 @@ export const LANE_WIDTH = 1.2;
 export const RUNWAY_HALF_WIDTH = LANE_WIDTH * 2;
 export const SPEED_Z = 10.5;
 export const FAR_Z = -24;
-export const NEAR_Z = 1.25;
-export const PAD_FRONT_Z = 1.05;
+export const NEAR_Z = 1.65;
+export const PAD_FRONT_Z = 1.45;
 export const PAD_BACK_Z = 0.08;
 export const PAD_HEIGHT = 0.12;
 

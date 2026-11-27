@@ -60,7 +60,7 @@ Máy cần Python có pip và Node.js. Công cụ dùng Node hiện đang chạy
 - `analysis/prepare.py`: tải âm thanh, nén MP3 44.1 kHz để phát và dò onset bằng librosa ở 22.05 kHz / hop 256; ước lượng BPM và độ sáng phổ.
 - `analysis/jobs.mjs`: tiến trình nền, tiến độ, cache LRU tối đa 15 bài, hủy và timeout 12 phút.
 - `server.mjs`: API localhost và phục vụ audio/video; kiểm tra Host/Origin, ID và giới hạn body.
-- `public/engine.js`: chọn các onset nổi bật theo độ khó (Dễ / Thường / Khó), chống lặp một cột liên tiếp và giữ nguyên timestamp.
+- `public/engine.js`: chọn các onset nổi bật theo độ khó (Thường / Khó), chống lặp một cột liên tiếp và giữ nguyên timestamp.
 - `public/app.js`: chuẩn bị bài, Web Audio, bù độ trễ đầu ra và Bluetooth, pause/resume an toàn với nốt giữ, Canvas và chấm điểm.
 - `public/stage3d.js`: chiếu đường băng và khối nốt 3D lên Canvas, quy đổi tọa độ chạm sang cột.
 - `.cache/analysis/<video-id>/`: lưu MP3 (hoặc WAV ở cache cũ), MP4 không tiếng (nếu có) và bản phân tích. Các tệp cache được Git bỏ qua.

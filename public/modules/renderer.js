@@ -12,7 +12,7 @@ import {
 } from '../stage3d.js';
 
 const GRID_STEP_Z = 3.0;
-const NOTE_DEPTH = 1.35;
+const NOTE_DEPTH = 1.68;
 const NOTE_HEIGHT = 0.32;
 const HOLD_HEIGHT = 0.15;
 const INITIAL_POOL = 96;

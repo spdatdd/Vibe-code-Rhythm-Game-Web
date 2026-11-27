@@ -1,10 +1,9 @@
 const STORAGE_KEY = 'orbit-settings-v1';
 const RECORDS_KEY = 'orbit-records-v1';
-const DIFFICULTIES = ['easy', 'normal', 'hard'];
+const DIFFICULTIES = ['normal', 'hard'];
 const RENDER_MODES = ['2d', '3d'];
-const PLAY_MODES = ['standard', 'sudden-death'];
 
-/** Chuẩn hóa độ khó về một trong ba mức hợp lệ. */
+/** Chuẩn hóa độ khó về một trong hai mức hợp lệ. */
 export function normalizeDifficulty(value) {
   return DIFFICULTIES.includes(value) ? value : 'normal';
 }
@@ -12,11 +11,6 @@ export function normalizeDifficulty(value) {
 /** Chuẩn hóa chế độ hiển thị, mặc định là 2D. */
 export function normalizeRenderMode(value) {
   return RENDER_MODES.includes(value) ? value : '2d';
-}
-
-/** Chuẩn hóa luật chơi: Chuẩn hoặc Sinh tồn (Piano Tiles). */
-export function normalizePlayMode(value) {
-  return PLAY_MODES.includes(value) ? value : 'standard';
 }
 
 /** Giới hạn tốc độ rơi của nốt trong khoảng [0.5, 2.0] theo bước 0.1. */
@@ -38,7 +32,6 @@ export function loadSettings(storage = globalThis.localStorage) {
     difficulty: 'normal',
     audioOffsetMs: 0,
     renderMode: '2d',
-    playMode: 'standard',
     scrollSpeed: 1.0,
     demoId: 'neon-drift',
   };
@@ -50,7 +43,6 @@ export function loadSettings(storage = globalThis.localStorage) {
       difficulty: normalizeDifficulty(saved.difficulty),
       audioOffsetMs: Number.isFinite(saved.audioOffsetMs) ? clampOffsetMs(saved.audioOffsetMs) : 0,
       renderMode: normalizeRenderMode(saved.renderMode),
-      playMode: normalizePlayMode(saved.playMode),
       scrollSpeed: Number.isFinite(saved.scrollSpeed) ? clampScrollSpeed(saved.scrollSpeed) : 1.0,
       demoId: typeof saved.demoId === 'string' && saved.demoId ? saved.demoId : 'neon-drift',
     };
@@ -67,7 +59,6 @@ export function saveSettings(settings, storage = globalThis.localStorage) {
       difficulty: normalizeDifficulty(settings.difficulty),
       audioOffsetMs: clampOffsetMs(settings.audioOffsetMs),
       renderMode: normalizeRenderMode(settings.renderMode),
-      playMode: normalizePlayMode(settings.playMode),
       scrollSpeed: clampScrollSpeed(settings.scrollSpeed ?? 1.0),
       demoId: typeof settings.demoId === 'string' && settings.demoId ? settings.demoId : 'neon-drift',
     }));

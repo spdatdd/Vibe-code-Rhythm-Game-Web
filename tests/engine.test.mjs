@@ -11,7 +11,6 @@ import {
   clampScrollSpeed,
   normalizeDifficulty,
   normalizeRenderMode,
-  normalizePlayMode,
   loadSettings,
   saveSettings,
   loadRecords,
@@ -29,7 +28,7 @@ test('Đọc ID YouTube và từ chối tên miền giả', () => {
 });
 // Kiểm tra nốt giữ không đè lên nốt tiếp theo và bản đồ nằm trong thời lượng.
 test('Bản đồ có nhịp xác định, nốt giữ và không chồng nốt', () => {
-  for (const difficulty of ['easy', 'normal', 'hard']) {
+  for (const difficulty of ['normal', 'hard']) {
     const notes = makeChart({ bpm: 120, offset: 2, duration: 48, difficulty });
     assert.ok(notes.some(n => n.hold > 0));
     assert.equal(notes[0].time, 2);
@@ -62,9 +61,9 @@ test('Điểm, combo và chính xác có tính cả miss', () => {
 });
 // Mọi nốt vẫn nằm trên lưới phách sau nhiều nốt giữ và giữ pha mốc dưới hai giây.
 test('Không trôi nửa phách sau nốt giữ hoặc khi bỏ qua intro', () => {
-  for (const difficulty of ['easy', 'normal', 'hard']) {
+  for (const difficulty of ['normal', 'hard']) {
     const bpm = 127.35, offset = .237;
-    const step = 60 / bpm * (difficulty === 'easy' ? 2 : difficulty === 'hard' ? .5 : 1);
+    const step = 60 / bpm * (difficulty === 'hard' ? .5 : 1);
     const notes = makeChart({ bpm, offset, duration: 600, difficulty });
     assert.ok(notes[0].time >= 2);
     for (const note of notes) {
@@ -85,8 +84,8 @@ test('Căn BPM và mốc phách từ các lần gõ theo thời gian video', () 
 // Chart tự động giữ nguyên các thời điểm thật kể cả bài tăng hoặc giảm tốc độ.
 test('Chart phân tích giữ timestamp, lọc nốt sát nhau và không tạo nhịp giả', () => {
   const events = [0.3, .8, 1.31, 1.72, 2.05, 2.35, 2.62, 2.86, 3.03, 3.3].map((time, i) => ({ time, strength: .9, brightness: 200 + i * 150 }));
-  const easy = buildAnalyzedChart(events, 'easy', 4), hard = buildAnalyzedChart(events, 'hard', 4);
-  assert.ok(hard.length > easy.length);
+  const normal = buildAnalyzedChart(events, 'normal', 4), hard = buildAnalyzedChart(events, 'hard', 4);
+  assert.ok(hard.length > normal.length);
   assert.equal(hard[0].time, .3);
   assert.ok(hard.every(note => events.some(event => event.time === note.time)));
   assert.ok(hard.every(note => note.hold >= 0 && note.lane >= 0 && note.lane < 4));
@@ -158,14 +157,13 @@ test('Phân giải tệp âm thanh theo phiên bản và dọn cache LRU an toà
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
-// Module settings chuẩn hóa độ khó, luật chơi, tốc độ rơi, giới hạn offset và chịu lỗi khi thiếu localStorage.
+// Module settings chuẩn hóa độ khó, tốc độ rơi, giới hạn offset và chịu lỗi khi thiếu localStorage.
 test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () => {
   assert.equal(normalizeDifficulty('hard'), 'hard');
+  assert.equal(normalizeDifficulty('easy'), 'normal');
   assert.equal(normalizeDifficulty('unknown'), 'normal');
   assert.equal(normalizeRenderMode('3d'), '3d');
   assert.equal(normalizeRenderMode('invalid'), '2d');
-  assert.equal(normalizePlayMode('sudden-death'), 'sudden-death');
-  assert.equal(normalizePlayMode('invalid'), 'standard');
   assert.equal(clampScrollSpeed(3.5), 2.0);
   assert.equal(clampScrollSpeed(0.1), 0.5);
   assert.equal(clampScrollSpeed(1.24), 1.2);
@@ -178,15 +176,14 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     setItem: (key, value) => store.set(key, value),
   };
   assert.equal(
-    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'easy', audioOffsetMs: 35, renderMode: '3d', playMode: 'sudden-death', scrollSpeed: 1.4, demoId: 'hyper-orbit' }, mockStorage),
+    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'hard', audioOffsetMs: 35, renderMode: '3d', scrollSpeed: 1.4, demoId: 'hyper-orbit' }, mockStorage),
     true,
   );
   assert.deepEqual(loadSettings(mockStorage), {
     url: 'https://youtu.be/abcdefghijk',
-    difficulty: 'easy',
+    difficulty: 'hard',
     audioOffsetMs: 35,
     renderMode: '3d',
-    playMode: 'sudden-death',
     scrollSpeed: 1.4,
     demoId: 'hyper-orbit',
   });
@@ -195,7 +192,6 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     difficulty: 'normal',
     audioOffsetMs: 0,
     renderMode: '2d',
-    playMode: 'standard',
     scrollSpeed: 1.0,
     demoId: 'neon-drift',
   });
@@ -284,4 +280,26 @@ test('Phân tích tệp nhạc từ thiết bị dò đúng onset và từ chố
   ], 'normal', 5);
   assert.equal(beatPreferred.length, 1);
   assert.equal(beatPreferred[0].time, 1.0);
+
+  // Phân biệt được độ sáng phổ (tần số thấp vs cao) ở 44.1 kHz để chia cột hợp lý.
+  const sr44 = 44100;
+  const dualSamples = new Float32Array(sr44 * 6);
+  const lowOnsets = [0.5, 1.5, 2.5, 3.5, 4.5];
+  const highOnsets = [1.0, 2.0, 3.0, 4.0, 5.0];
+  const addTone = (t0, freq) => {
+    const start = Math.floor(t0 * sr44);
+    const len = Math.floor(sr44 * 0.16);
+    for (let i = 0; i < len && start + i < dualSamples.length; i++) {
+      const t = i / sr44;
+      const env = Math.min(1, t / 0.004) * Math.exp(-t * 20);
+      dualSamples[start + i] += 0.6 * env * Math.sin(2 * Math.PI * freq * t);
+    }
+  };
+  for (const t of lowOnsets) addTone(t, 180);
+  for (const t of highOnsets) addTone(t, 2600);
+  const dualResult = analyzeChannelData(dualSamples, sr44);
+  const lowEvent = dualResult.events.find(e => Math.abs(e.time - 1.5) < 0.05);
+  const highEvent = dualResult.events.find(e => Math.abs(e.time - 2.0) < 0.05);
+  assert.ok(lowEvent && highEvent);
+  assert.ok(highEvent.brightness > lowEvent.brightness * 3, `Expected brighter high note: ${highEvent.brightness} vs ${lowEvent.brightness}`);
 });

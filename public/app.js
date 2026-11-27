@@ -7,12 +7,11 @@ import {
   clampScrollSpeed,
   normalizeDifficulty,
   normalizeRenderMode,
-  normalizePlayMode,
   loadRecords,
   saveRecord,
 } from './modules/settings.js';
 import { createAudioEngine } from './modules/audio.js';
-import { analyzeAudioBuffer } from './modules/local-analyzer.js';
+import { analyzeAudioBufferAsync } from './modules/local-analyzer.js';
 import { checkAnalysisSupport, prepareTrack, cancelTrackPreparation } from './modules/youtube-client.js';
 import { createRenderer } from './modules/renderer.js';
 import { createRenderer2D } from './modules/renderer2d.js';
@@ -24,13 +23,12 @@ const canvas2d = $('arena-2d');
 const canvas3d = $('arena-3d');
 const difficultyButtons = [...document.querySelectorAll('[data-difficulty]')];
 const renderModeButtons = [...document.querySelectorAll('[data-render-mode]')];
-const playModeButtons = [...document.querySelectorAll('[data-play-mode]')];
 const colors = ['#007aff', '#af52de', '#ff9500', '#10b981'];
 const laneLabels = ['D', 'F', 'J', 'K'];
 const activeHolds = new Map();
 const MAX_MISSES = 5;
 
-let difficulty = 'normal', renderMode = '2d', playMode = 'standard', scrollSpeed = 1.0, audioOffsetMs = 0;
+let difficulty = 'normal', renderMode = '2d', scrollSpeed = 1.0, audioOffsetMs = 0;
 let demoId = DEMO_TRACKS[0].id;
 let source = 'demo', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
 let localTrack = null, localBuffer = null;
@@ -86,7 +84,6 @@ function persistSettings() {
     difficulty,
     audioOffsetMs,
     renderMode,
-    playMode,
     scrollSpeed,
     demoId,
   });
@@ -94,7 +91,7 @@ function persistSettings() {
 
 function getRecordKey() {
   const trackKey = source === 'demo' ? demoId : source === 'local' ? (localTrack?.title || 'local') : (loadedId || 'youtube');
-  return `${source}:${trackKey}:${difficulty}:${playMode}`;
+  return `${source}:${trackKey}:${difficulty}`;
 }
 
 function renderDemoList() {
@@ -106,7 +103,7 @@ function renderDemoList() {
     btn.type = 'button';
     btn.className = `demo-tile${track.id === demoId ? ' selected' : ''}`;
     btn.dataset.demoId = track.id;
-    const rec = records[`demo:${track.id}:${difficulty}:${playMode}`];
+    const rec = records[`demo:${track.id}:${difficulty}`];
     const recText = rec ? `${rec.rank} · ${rec.score.toLocaleString('vi-VN')}` : '';
     btn.innerHTML = `
       <div class="vinyl"></div>
@@ -172,7 +169,6 @@ function setMode(next) {
   gamepad.setLocked(active || preparing);
   for (const button of difficultyButtons) button.disabled = active || preparing;
   for (const button of renderModeButtons) button.disabled = active || preparing;
-  for (const button of playModeButtons) button.disabled = active || preparing;
   for (const btn of $('demo-list').querySelectorAll('button')) btn.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
   for (const id of ['demo-tab', 'local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
@@ -184,15 +180,14 @@ function setMode(next) {
 }
 
 function updateGameHeader() {
-  const diffLabel = { easy: 'DỄ', normal: 'THƯỜNG', hard: 'KHÓ' }[difficulty];
-  const modeLabel = playMode === 'sudden-death' ? ' · SINH TỒN' : '';
+  const diffLabel = { normal: 'THƯỜNG', hard: 'KHÓ' }[difficulty] || 'THƯỜNG';
   const title = source === 'demo'
     ? selectedDemo().title.toUpperCase()
     : source === 'local'
       ? (localTrack?.title || 'NHẠC THIẾT BỊ')
       : (prepared?.title || 'YOUTUBE');
   $('game-title').textContent = title;
-  $('game-meta').textContent = `${diffLabel}${modeLabel} · ${chart.length} NỐT`;
+  $('game-meta').textContent = `${diffLabel} · ${chart.length} NỐT`;
 }
 
 async function start() {
@@ -294,7 +289,7 @@ async function restartRound() {
 function handleMiss() {
   stats.misses += 1;
   if (mode !== 'playing') return;
-  if (playMode === 'sudden-death' || stats.misses >= MAX_MISSES) {
+  if (stats.misses >= MAX_MISSES) {
     finish(true);
   }
 }
@@ -345,7 +340,7 @@ async function handleLocalFile(file) {
   try {
     const bytes = await file.arrayBuffer();
     const decoded = await audio.decode(bytes);
-    const analyzed = analyzeAudioBuffer(decoded);
+    const analyzed = await analyzeAudioBufferAsync(decoded);
     const title = file.name.replace(/\.[^/.]+$/, '') || file.name;
     localTrack = { ...analyzed, title };
     localBuffer = decoded;
@@ -427,20 +422,12 @@ function selectSource(next) {
 }
 
 function selectDifficulty(next) {
-  if (!['easy', 'normal', 'hard'].includes(next) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
+  if (!['normal', 'hard'].includes(next) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
   difficulty = normalizeDifficulty(next);
   for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
   persistSettings();
   renderDemoList();
   resetRound();
-}
-
-function selectPlayMode(next) {
-  if (!['standard', 'sudden-death'].includes(next) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
-  playMode = normalizePlayMode(next);
-  for (const button of playModeButtons) button.classList.toggle('selected', button.dataset.playMode === playMode);
-  persistSettings();
-  renderDemoList();
 }
 
 function setScrollSpeed(value) {
@@ -508,7 +495,6 @@ $('audio-offset').addEventListener('input', event => { setAudioOffset(event.targ
 $('scroll-speed').addEventListener('input', event => { setScrollSpeed(event.target.value); persistSettings(); });
 for (const button of difficultyButtons) button.addEventListener('click', () => selectDifficulty(button.dataset.difficulty));
 for (const button of renderModeButtons) button.addEventListener('click', () => selectRenderMode(button.dataset.renderMode));
-for (const button of playModeButtons) button.addEventListener('click', () => selectPlayMode(button.dataset.playMode));
 $('video-url').addEventListener('input', () => {
   clearTimeout(pasteTimer); prepared = null; musicBuffer = null; loadedId = ''; setMode('idle'); resetRound();
   $('track-title').textContent = ''; $('original-video').hidden = true;
@@ -529,10 +515,8 @@ dropZone.addEventListener('drop', event => {
 const saved = loadSettings();
 $('video-url').value = saved.url;
 difficulty = saved.difficulty;
-playMode = saved.playMode;
 demoId = DEMO_TRACKS.some(t => t.id === saved.demoId) ? saved.demoId : DEMO_TRACKS[0].id;
 for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
-for (const button of playModeButtons) button.classList.toggle('selected', button.dataset.playMode === playMode);
 selectRenderMode(saved.renderMode);
 setScrollSpeed(saved.scrollSpeed);
 setAudioOffset(saved.audioOffsetMs);
