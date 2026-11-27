@@ -34,9 +34,32 @@ def audio_features(wav_path, sr, hop):
             peak_level = max(peak_level, float(np.max(np.abs(y))))
             # Bỏ biên có đệm của mỗi đoạn, chỉ giữ vị trí thuộc đoạn chính.
             region = slice(start - first, end - first)
-            envelope[start:end] = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)[region]
+            onset_low = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop, fmin=45, fmax=2500)[region]
+            onset_mid = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop, fmin=2500, fmax=6000)[region]
+            envelope[start:end] = 0.72 * onset_low + 0.28 * onset_mid
             centroid[start:end] = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop)[0, region]
         return duration, wave.samplerate, peak_level, envelope, centroid
+
+
+def _compute_beat_score(seconds, beat_times):
+    """Tính độ khớp của thời điểm onset với phách chính / nửa phách (0..1)."""
+    import numpy as np
+
+    if len(beat_times) < 2:
+        return 0.0
+    idx = int(np.searchsorted(beat_times, seconds))
+    dist_beat = min(
+        abs(seconds - beat_times[idx]) if idx < len(beat_times) else 1e9,
+        abs(seconds - beat_times[idx - 1]) if idx > 0 else 1e9,
+    )
+    if dist_beat <= 0.065:
+        return round(float(1.0 - dist_beat / 0.065), 3)
+    if 0 < idx < len(beat_times):
+        mid = 0.5 * (beat_times[idx - 1] + beat_times[idx])
+        dist_half = abs(seconds - mid)
+        if dist_half <= 0.065:
+            return round(float((1.0 - dist_half / 0.065) * 0.65), 3)
+    return 0.0
 
 
 def analyze(wav_path):
@@ -55,6 +78,9 @@ def analyze(wav_path):
     backtracked = librosa.onset.onset_backtrack(peaks, envelope)
     aligned = np.maximum(backtracked, peaks - 5)
     report('analyzing', 78, 'Đang phân loại cường độ và tạo bản đồ nốt…')
+    tempo, beat_frames = librosa.beat.beat_track(onset_envelope=envelope, sr=sr, hop_length=hop, units='frames')
+    bpm = float(np.asarray(tempo).reshape(-1)[0]) if np.asarray(tempo).size else 0.0
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr, hop_length=hop) if len(beat_frames) else np.array([])
     strengths = envelope[peaks] if len(peaks) else np.array([])
     scale = float(np.percentile(strengths, 90)) if len(strengths) else 1.0
     events = []
@@ -64,15 +90,10 @@ def analyze(wav_path):
             continue
         events.append({'time': round(seconds, 5),
                        'strength': round(min(1.0, float(strengths[index]) / max(scale, .00001)), 4),
-                       'brightness': round(float(centroid[min(int(peaks[index]), len(centroid) - 1)]), 2)})
+                       'brightness': round(float(centroid[min(int(peaks[index]), len(centroid) - 1)]), 2),
+                       'beatScore': _compute_beat_score(seconds, beat_times)})
     if len(events) < 8:
         raise ValueError('Không tìm thấy đủ điểm khởi âm rõ ràng. Hãy thử bản nhạc khác.')
-    # BPM tham khảo dùng đoạn tối đa 45 giây quanh điểm khởi âm mạnh nhất.
-    tempo_window = 45 * sr // hop
-    tempo_start = max(0, min(len(envelope) - tempo_window, int(np.argmax(envelope)) - tempo_window // 2))
-    tempo, _ = librosa.beat.beat_track(onset_envelope=envelope[tempo_start:tempo_start + tempo_window],
-                                     sr=sr, hop_length=hop)
-    bpm = float(np.asarray(tempo).reshape(-1)[0])
     confidence = round(float(np.mean(strengths > max(scale * .25, .00001))), 3)
     return {'duration': round(duration, 5), 'bpm': round(bpm, 2), 'events': events,
-            'confidence': confidence, 'method': 'spectral-onset-v1', 'sampleRate': sample_rate}
+            'confidence': confidence, 'method': 'spectral-onset-v2', 'sampleRate': sample_rate}

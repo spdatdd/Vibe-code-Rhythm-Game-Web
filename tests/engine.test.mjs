@@ -227,6 +227,22 @@ test('Demo tracks, tính Rank/sao, lưu kỷ lục và hợp âm mức Khó', ()
   assert.ok(hardWithChords.length > chordEvents.length);
   const sameTimeGroups = hardWithChords.filter((n, idx, arr) => arr.some((m, j) => j !== idx && m.time === n.time && m.lane !== n.lane));
   assert.ok(sameTimeGroups.length >= 2);
+
+  // Ưu tiên onset khớp phách (beatScore) và làm mượt bước nhảy biên khi kick/hi-hat phân cực.
+  const beatPriority = buildAnalyzedChart([
+    { time: 1.0, strength: 0.72, brightness: 400, beatScore: 1.0 },
+    { time: 1.08, strength: 0.82, brightness: 400, beatScore: 0.0 },
+  ], 'normal', 4);
+  assert.equal(beatPriority.length, 1);
+  assert.equal(beatPriority[0].time, 1.0);
+
+  const polarized = Array.from({ length: 8 }, (_, i) => ({
+    time: 0.5 + i * 0.25,
+    strength: 0.9,
+    brightness: i % 2 === 0 ? 100 : 5000,
+  }));
+  const smoothed = buildAnalyzedChart(polarized, 'normal', 5);
+  assert.ok(smoothed.some(n => n.lane === 1 || n.lane === 2));
 });
 // Chế độ 2D xác định đúng 4 cột Piano Tiles căn giữa và từ chối vùng ngoài khung.
 test('Chạm cột chế độ 2D xác định đúng cột và từ chối ngoài vùng', () => {

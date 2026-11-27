@@ -48,7 +48,7 @@ export function buildAnalyzedChart(events, difficulty, duration, { allowChords =
   const minHold = { easy: .58, normal: .42, hard: .32 }[difficulty] || .42;
   const candidates = events.filter(event => Number.isFinite(event.time) && event.time >= 0 && event.time < duration - .1 && event.strength >= threshold);
   const selected = [];
-  const priority = event => event.strength * (1 + 0.45 * (event.beatScore || 0));
+  const priority = event => event.strength * (0.65 + 0.35 * (Number.isFinite(event.beatScore) ? event.beatScore : 0));
   // Ưu tiên điểm khởi âm mạnh và khớp nhịp trong những cụm nốt quá sát nhau.
   for (const event of [...candidates].sort((a, b) => priority(b) - priority(a) || a.time - b.time)) {
     if (!selected.some(other => Math.abs(other.time - event.time) < gap)) selected.push(event);
@@ -56,14 +56,23 @@ export function buildAnalyzedChart(events, difficulty, duration, { allowChords =
   selected.sort((a, b) => a.time - b.time);
   const brightness = selected.map(event => event.brightness).sort((a, b) => a - b);
   const boundaries = [.25, .5, .75].map(q => brightness[Math.floor((brightness.length - 1) * q)] || 0);
-  // Phân cột theo độ sáng phổ, đổi cột khi lặp nhanh và tạo nốt giữ khi đủ khoảng trống.
-  let lastLane = -1, lastTime = -Infinity, notesSinceChord = 0;
+  // Phân cột theo độ sáng phổ, chống lặp nhanh và làm mượt bước nhảy biên khi kick/hi-hat phân cực.
+  let lastLane = -1, lastTime = -Infinity, notesSinceChord = 0, edgeJumpStreak = 0;
   const notes = [];
   for (let index = 0; index < selected.length; index++) {
     const event = selected[index];
     let lane = boundaries.filter(value => event.brightness > value).length;
     if (lane === lastLane && event.time - lastTime < .32) {
       lane = lane === 0 ? 1 : lane === 3 ? 2 : index % 2 ? lane + 1 : lane - 1;
+      edgeJumpStreak = 0;
+    } else if (lastLane >= 0 && Math.abs(lane - lastLane) >= 3 && event.time - lastTime < .45) {
+      edgeJumpStreak++;
+      if (edgeJumpStreak >= 2) {
+        lane = lastLane === 0 ? 1 : 2;
+        edgeJumpStreak = 0;
+      }
+    } else {
+      edgeJumpStreak = 0;
     }
     lastLane = lane;
     lastTime = event.time;

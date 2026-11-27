@@ -133,12 +133,12 @@ export function analyzeChannelData(samples, sampleRate) {
     throw new Error('Tệp âm thanh bị im lặng.');
   }
 
-  // Tính phổ biến thiên năng lượng (spectral flux đơn giản hóa) theo từng khung.
+  // Tính phổ biến thiên năng lượng, giảm trọng số nhiễu cao tần để ưu tiên biến thiên theo nhịp.
   const flux = new Float32Array(frameCount);
   for (let f = 1; f < frameCount; f++) {
     const dTotal = Math.max(0, totalEnergy[f] - totalEnergy[f - 1]);
     const dHigh = Math.max(0, highBand[f] - highBand[f - 1]);
-    flux[f] = dTotal + dHigh * 0.65;
+    flux[f] = dTotal + dHigh * 0.25;
   }
 
   const fps = sampleRate / hop;

@@ -28,6 +28,7 @@ const playModeButtons = [...document.querySelectorAll('[data-play-mode]')];
 const colors = ['#007aff', '#af52de', '#ff9500', '#10b981'];
 const laneLabels = ['D', 'F', 'J', 'K'];
 const activeHolds = new Map();
+const MAX_MISSES = 5;
 
 let difficulty = 'normal', renderMode = '2d', playMode = 'standard', scrollSpeed = 1.0, audioOffsetMs = 0;
 let demoId = DEMO_TRACKS[0].id;
@@ -156,7 +157,7 @@ function resetRound() {
     : custom
       ? buildAnalyzedChart(custom.data.events, difficulty, duration, { allowChords: difficulty === 'hard' })
       : [];
-  stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0 };
+  stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0, misses: 0 };
   elapsed = 0; nextMissIndex = 0; resumeGraceUntil = 0; feedback = '';
   audio.resetDemoBeat(-1); activeHolds.clear(); inputs.clear(); renderer2d.clearEffects(); renderer3d?.clearEffects();
   $('note-count').textContent = `${chart.length} nốt`;
@@ -290,6 +291,14 @@ async function restartRound() {
   await start();
 }
 
+function handleMiss() {
+  stats.misses += 1;
+  if (mode !== 'playing') return;
+  if (playMode === 'sudden-death' || stats.misses >= MAX_MISSES) {
+    finish(true);
+  }
+}
+
 function resolve(note, rating) {
   note.state = rating === 'MISS' ? 'miss' : 'hit';
   award(stats, rating);
@@ -299,7 +308,7 @@ function resolve(note, rating) {
   updateScore();
   if (rating === 'MISS') {
     navigator.vibrate?.(35);
-    if (playMode === 'sudden-death' && mode === 'playing') finish(true);
+    handleMiss();
   }
 }
 
@@ -315,7 +324,7 @@ function strike(lane) {
     feedbackUntil = performance.now() + 400;
     updateScore();
     navigator.vibrate?.(30);
-    if (playMode === 'sudden-death') finish(true);
+    handleMiss();
     return;
   }
   const rating = judge(t - note.time);
@@ -463,10 +472,11 @@ function frame() {
       if (source === 'demo') audio.scheduleDemo(audio.currentTime() - anchor, anchor, selectedDemo());
       const inGrace = performance.now() < resumeGraceUntil;
       for (const [lane, holdNote] of activeHolds) {
+        if (mode !== 'playing') break;
         if (t >= holdNote.time + holdNote.hold - .07) { activeHolds.delete(lane); resolve(holdNote, holdNote.rating); }
         else if (!inputs.isLaneHeld(lane) && !inGrace) { activeHolds.delete(lane); resolve(holdNote, 'MISS'); }
       }
-      while (nextMissIndex < chart.length && chart[nextMissIndex].time + .19 < t) {
+      while (mode === 'playing' && nextMissIndex < chart.length && chart[nextMissIndex].time + .19 < t) {
         if (chart[nextMissIndex].state === 'pending') resolve(chart[nextMissIndex], 'MISS');
         nextMissIndex++;
       }

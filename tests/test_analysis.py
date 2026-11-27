@@ -63,6 +63,8 @@ class AnalysisTests(unittest.TestCase):
         errors = [min(abs(point - onset) for point in found) for onset in times]
         self.assertLess(max(errors), .05)
         self.assertEqual(result['sampleRate'], 22050)
+        self.assertTrue(all(0.0 <= event['beatScore'] <= 1.0 for event in result['events']))
+        self.assertTrue(any(event['beatScore'] > 0.5 for event in result['events']))
 
 
 if __name__ == '__main__':
