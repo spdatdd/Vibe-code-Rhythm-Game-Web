@@ -409,8 +409,14 @@ function frame() {
 }
 
 // Sự kiện điều hướng và nguồn nhạc.
-window.addEventListener('blur', () => { if (screen === 'game' && mode === 'playing') togglePause(); inputs.clear(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'game' && mode === 'playing') togglePause(); });
+function pauseOnLeave() {
+  if (screen === 'game' && mode === 'playing') togglePause();
+  inputs.clear();
+}
+window.addEventListener('blur', pauseOnLeave);
+window.addEventListener('pagehide', pauseOnLeave);
+document.addEventListener('pause', pauseOnLeave);
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseOnLeave(); });
 $('start').addEventListener('click', start);
 $('pause').addEventListener('click', togglePause);
 $('resume-btn').addEventListener('click', togglePause);
