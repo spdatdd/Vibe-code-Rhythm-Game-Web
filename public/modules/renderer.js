@@ -12,30 +12,13 @@ import {
 } from '../stage3d.js';
 
 const GRID_STEP_Z = 3.0;
-const NOTE_DEPTH = 0.94;
+const NOTE_DEPTH = 1.35;
 const NOTE_HEIGHT = 0.32;
 const HOLD_HEIGHT = 0.15;
 const INITIAL_POOL = 96;
 
-/** Tạo nhãn chữ sắc nét trên mặt phím 3D bằng CanvasTexture. */
-function makePadLabelTexture(label, held) {
-  const texCanvas = document.createElement('canvas');
-  texCanvas.width = 128;
-  texCanvas.height = 128;
-  const ctx = texCanvas.getContext('2d');
-  ctx.clearRect(0, 0, 128, 128);
-  ctx.font = 'bold 64px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = held ? '#ffffff' : '#1e293b';
-  ctx.fillText(label, 64, 64);
-  const texture = new THREE.CanvasTexture(texCanvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 /** Dựng sân chơi 3D bằng Three.js WebGL với object pooling để giữ khung hình mượt. */
-export function createRenderer(canvas, { colors, laneLabels, reducedMotion, countdownEl, feedbackEl }) {
+export function createRenderer(canvas, { colors, reducedMotion, countdownEl, feedbackEl }) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -115,8 +98,6 @@ export function createRenderer(canvas, { colors, laneLabels, reducedMotion, coun
   const padDepth = PAD_FRONT_Z - PAD_BACK_Z;
   const padCenterZ = (PAD_FRONT_Z + PAD_BACK_Z) / 2;
   const padGeom = new THREE.BoxGeometry(padWidth, PAD_HEIGHT, padDepth);
-  const labelGeom = new THREE.PlaneGeometry(0.55, 0.55);
-  labelGeom.rotateX(-Math.PI / 2);
 
   const pads = [];
   for (let lane = 0; lane < 4; lane++) {
@@ -130,13 +111,6 @@ export function createRenderer(canvas, { colors, laneLabels, reducedMotion, coun
     const mesh = new THREE.Mesh(padGeom, mat);
     mesh.position.set(x, PAD_HEIGHT / 2, padCenterZ);
     scene.add(mesh);
-
-    const idleTex = makePadLabelTexture(laneLabels[lane], false);
-    const heldTex = makePadLabelTexture(laneLabels[lane], true);
-    const labelMat = new THREE.MeshBasicMaterial({ map: idleTex, transparent: true });
-    const labelMesh = new THREE.Mesh(labelGeom, labelMat);
-    labelMesh.position.set(x, PAD_HEIGHT + 0.005, padCenterZ);
-    scene.add(labelMesh);
 
     const flashMat = new THREE.MeshBasicMaterial({
       color: colors[lane],
@@ -152,7 +126,7 @@ export function createRenderer(canvas, { colors, laneLabels, reducedMotion, coun
     flashMesh.position.set(x, PAD_HEIGHT + 0.012, padCenterZ);
     scene.add(flashMesh);
 
-    pads.push({ mesh, mat, labelMesh, labelMat, idleTex, heldTex, flashMat, flashMesh, color: new THREE.Color(colors[lane]) });
+    pads.push({ mesh, mat, flashMat, flashMesh, color: new THREE.Color(colors[lane]) });
   }
 
   // Pool khối nốt và đuôi nốt giữ để không cấp phát bộ nhớ mỗi khung hình.
@@ -299,16 +273,13 @@ export function createRenderer(canvas, { colors, laneLabels, reducedMotion, coun
       const pad = pads[lane];
       const pressOffset = held ? -0.035 : 0;
       pad.mesh.position.y = PAD_HEIGHT / 2 + pressOffset;
-      pad.labelMesh.position.y = PAD_HEIGHT + 0.005 + pressOffset;
       pad.flashMesh.position.y = PAD_HEIGHT + 0.012 + pressOffset;
       if (held) {
         pad.mat.color.copy(pad.color);
         pad.mat.emissive.copy(pad.color).multiplyScalar(0.18);
-        pad.labelMat.map = pad.heldTex;
       } else {
         pad.mat.color.setHex(0xffffff);
         pad.mat.emissive.setHex(0x000000);
-        pad.labelMat.map = pad.idleTex;
       }
     }
 
@@ -330,17 +301,22 @@ export function createRenderer(canvas, { colors, laneLabels, reducedMotion, coun
       if (frontZ < FAR_Z || frontZ > NEAR_Z + NOTE_DEPTH) continue;
 
       const isHolding = note.state === 'holding';
+      const holdHeadDepth = padDepth - 0.08;
       const laneX = -RUNWAY_HALF_WIDTH + (note.lane + 0.5) * LANE_WIDTH;
       const laneColor = noteColors[note.lane];
       const head = acquireHead(usedHeads++);
       head.visible = true;
-      head.scale.set(isHolding ? (padWidth - 0.06) / (LANE_WIDTH - 0.08) : 1, 1, 1);
+      head.scale.set(
+        isHolding ? (padWidth - 0.06) / (LANE_WIDTH - 0.08) : 1,
+        1,
+        isHolding ? holdHeadDepth / NOTE_DEPTH : 1,
+      );
       head.position.set(laneX, NOTE_HEIGHT / 2, isHolding ? padCenterZ : frontZ - NOTE_DEPTH / 2);
       head.material.color.copy(laneColor);
       head.material.emissive.copy(laneColor).multiplyScalar(0.28);
 
       if (note.hold) {
-        const tailStartZ = isHolding ? padCenterZ - NOTE_DEPTH / 2 : frontZ;
+        const tailStartZ = isHolding ? padCenterZ - holdHeadDepth / 2 : frontZ;
         const tailEndZ = Math.max(FAR_Z, -(note.time + note.hold - time) * speedZ);
         const tailLength = tailStartZ - tailEndZ;
         if (tailLength > 0.05) {

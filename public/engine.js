@@ -41,14 +41,16 @@ export function calculateRank(accuracy, failed = false) {
   return { rank: 'C', stars: 0 };
 }
 
-// Tạo chart từ onset thật, chọn nốt nổi bật theo độ khó mà không dời timestamp.
+// Tạo chart từ onset thật, chọn nốt nổi bật theo độ khó và ưu tiên nốt khớp phách.
 export function buildAnalyzedChart(events, difficulty, duration, { allowChords = false } = {}) {
   const gap = { easy: .42, normal: .25, hard: .14 }[difficulty] || .25;
   const threshold = { easy: .30, normal: .12, hard: .035 }[difficulty] || .12;
+  const minHold = { easy: .58, normal: .42, hard: .32 }[difficulty] || .42;
   const candidates = events.filter(event => Number.isFinite(event.time) && event.time >= 0 && event.time < duration - .1 && event.strength >= threshold);
   const selected = [];
-  // Ưu tiên điểm khởi âm mạnh trong những cụm nốt quá sát nhau.
-  for (const event of [...candidates].sort((a, b) => b.strength - a.strength || a.time - b.time)) {
+  const priority = event => event.strength * (1 + 0.45 * (event.beatScore || 0));
+  // Ưu tiên điểm khởi âm mạnh và khớp nhịp trong những cụm nốt quá sát nhau.
+  for (const event of [...candidates].sort((a, b) => priority(b) - priority(a) || a.time - b.time)) {
     if (!selected.some(other => Math.abs(other.time - event.time) < gap)) selected.push(event);
   }
   selected.sort((a, b) => a.time - b.time);
@@ -67,7 +69,7 @@ export function buildAnalyzedChart(events, difficulty, duration, { allowChords =
     lastTime = event.time;
     const nextTime = index + 1 < selected.length ? selected[index + 1].time : duration - .15;
     const maxHold = Math.min(1.6, nextTime - event.time - .2, duration - .2 - event.time);
-    const hold = maxHold >= .32 ? Number(maxHold.toFixed(3)) : 0;
+    const hold = maxHold >= minHold ? Number(maxHold.toFixed(3)) : 0;
     notes.push({ time: event.time, lane, hold, state: 'pending' });
     if (allowChords && difficulty === 'hard' && hold === 0 && event.strength >= .78 && notesSinceChord >= 3) {
       notes.push({ time: event.time, lane: (lane + 2) % 4, hold: 0, state: 'pending' });

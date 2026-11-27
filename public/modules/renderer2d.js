@@ -1,5 +1,5 @@
 const PIXELS_PER_SECOND = 460;
-const NOTE_HEIGHT = 62;
+const NOTE_HEIGHT = 88;
 
 /** Tính khung 4 cột Piano Tiles 2D căn giữa theo kích thước màn hình. */
 export function getLayout2D(width, height) {
@@ -19,7 +19,7 @@ export function laneAt2D(width, height, x, y) {
 }
 
 /** Dựng bộ vẽ Canvas 2D tối giản, sắc nét theo phong cách Piano Tiles trên iPhone. */
-export function createRenderer2D(canvas, { colors, laneLabels, reducedMotion, countdownEl, feedbackEl }) {
+export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, feedbackEl }) {
   const ctx = canvas.getContext('2d');
   const laneEffects = new Map();
 
@@ -147,12 +147,6 @@ export function createRenderer2D(canvas, { colors, laneLabels, reducedMotion, co
         ctx.stroke();
         ctx.restore();
       }
-
-      ctx.fillStyle = held ? '#ffffff' : '#1e293b';
-      ctx.font = '700 16px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(laneLabels[lane], x + padW / 2, padY + padHeight / 2);
     }
 
     // Hiệu ứng gợn sáng khi chạm cột.

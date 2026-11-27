@@ -86,18 +86,6 @@ export function createAudioEngine({ onBufferEnded }) {
     lastBeat = beat;
   }
 
-  /** Phát âm thanh phản hồi nhẹ khi bấm nốt hoặc báo lỗi khi bấm ô trống. */
-  function playHitsound(lane, isMiss = false) {
-    if (!context || context.state !== 'running') return;
-    const now = context.currentTime;
-    if (isMiss) {
-      tone(110, now, .09, 'sawtooth', .08);
-      return;
-    }
-    const pitches = [523.25, 587.33, 659.25, 783.99];
-    tone(pitches[lane] || 523.25, now, .075, 'triangle', .08);
-  }
-
   /** Lên lịch vòng nhạc demo bằng đồng hồ âm thanh thay vì bộ đếm JavaScript. */
   function scheduleDemo(t, anchor, demo) {
     const beat = 60 / demo.bpm;
@@ -125,6 +113,5 @@ export function createAudioEngine({ onBufferEnded }) {
     stopSynth,
     resetDemoBeat,
     scheduleDemo,
-    playHitsound,
   };
 }

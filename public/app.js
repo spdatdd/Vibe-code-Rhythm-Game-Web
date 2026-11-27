@@ -29,7 +29,7 @@ const colors = ['#007aff', '#af52de', '#ff9500', '#10b981'];
 const laneLabels = ['D', 'F', 'J', 'K'];
 const activeHolds = new Map();
 
-let difficulty = 'normal', renderMode = '2d', playMode = 'standard', scrollSpeed = 1.0, hitsoundEnabled = true, audioOffsetMs = 0;
+let difficulty = 'normal', renderMode = '2d', playMode = 'standard', scrollSpeed = 1.0, audioOffsetMs = 0;
 let demoId = DEMO_TRACKS[0].id;
 let source = 'demo', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
 let localTrack = null, localBuffer = null;
@@ -87,7 +87,6 @@ function persistSettings() {
     renderMode,
     playMode,
     scrollSpeed,
-    hitsound: hitsoundEnabled,
     demoId,
   });
 }
@@ -175,7 +174,6 @@ function setMode(next) {
   for (const button of playModeButtons) button.disabled = active || preparing;
   for (const btn of $('demo-list').querySelectorAll('button')) btn.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
-  $('hitsound-toggle').disabled = active || preparing;
   for (const id of ['demo-tab', 'local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
   $('youtube-tab').disabled ||= !analysisAvailable;
   $('start').disabled = active || preparing || (source !== 'demo' && !activePrepared());
@@ -310,7 +308,6 @@ function strike(lane) {
   const t = time();
   if (activeHolds.has(lane)) return;
   const note = findNote(chart, lane, t);
-  if (hitsoundEnabled) audio.playHitsound(lane, !note);
   if (!note) {
     activeRenderer().triggerEffect(lane, 'MISS');
     award(stats, 'MISS');
@@ -499,7 +496,6 @@ $('load-video').addEventListener('click', loadVideo);
 $('cancel-prepare').addEventListener('click', cancelPreparation);
 $('audio-offset').addEventListener('input', event => { setAudioOffset(event.target.value); persistSettings(); });
 $('scroll-speed').addEventListener('input', event => { setScrollSpeed(event.target.value); persistSettings(); });
-$('hitsound-toggle').addEventListener('change', event => { hitsoundEnabled = Boolean(event.target.checked); persistSettings(); });
 for (const button of difficultyButtons) button.addEventListener('click', () => selectDifficulty(button.dataset.difficulty));
 for (const button of renderModeButtons) button.addEventListener('click', () => selectRenderMode(button.dataset.renderMode));
 for (const button of playModeButtons) button.addEventListener('click', () => selectPlayMode(button.dataset.playMode));
@@ -524,11 +520,9 @@ const saved = loadSettings();
 $('video-url').value = saved.url;
 difficulty = saved.difficulty;
 playMode = saved.playMode;
-hitsoundEnabled = saved.hitsound;
 demoId = DEMO_TRACKS.some(t => t.id === saved.demoId) ? saved.demoId : DEMO_TRACKS[0].id;
 for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
 for (const button of playModeButtons) button.classList.toggle('selected', button.dataset.playMode === playMode);
-$('hitsound-toggle').checked = hitsoundEnabled;
 selectRenderMode(saved.renderMode);
 setScrollSpeed(saved.scrollSpeed);
 setAudioOffset(saved.audioOffsetMs);

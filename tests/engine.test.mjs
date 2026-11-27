@@ -178,7 +178,7 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     setItem: (key, value) => store.set(key, value),
   };
   assert.equal(
-    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'easy', audioOffsetMs: 35, renderMode: '3d', playMode: 'sudden-death', scrollSpeed: 1.4, hitsound: false, demoId: 'hyper-orbit' }, mockStorage),
+    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'easy', audioOffsetMs: 35, renderMode: '3d', playMode: 'sudden-death', scrollSpeed: 1.4, demoId: 'hyper-orbit' }, mockStorage),
     true,
   );
   assert.deepEqual(loadSettings(mockStorage), {
@@ -188,7 +188,6 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     renderMode: '3d',
     playMode: 'sudden-death',
     scrollSpeed: 1.4,
-    hitsound: false,
     demoId: 'hyper-orbit',
   });
   assert.deepEqual(loadSettings({ getItem: () => '{broken' }), {
@@ -198,7 +197,6 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     renderMode: '2d',
     playMode: 'standard',
     scrollSpeed: 1.0,
-    hitsound: true,
     demoId: 'neon-drift',
   });
 });
@@ -262,4 +260,12 @@ test('Phân tích tệp nhạc từ thiết bị dò đúng onset và từ chố
   }
   assert.throws(() => analyzeChannelData(new Float32Array(sr * 6), sr));
   assert.throws(() => analyzeChannelData(new Float32Array(sr * 2), sr));
+
+  // Ưu tiên nốt khớp phách (beatScore) khi hai ứng viên sát nhau có cường độ tương đương.
+  const beatPreferred = buildAnalyzedChart([
+    { time: 1.0, strength: 0.62, brightness: 400, beatScore: 1.0 },
+    { time: 1.12, strength: 0.68, brightness: 400, beatScore: 0 },
+  ], 'normal', 5);
+  assert.equal(beatPreferred.length, 1);
+  assert.equal(beatPreferred[0].time, 1.0);
 });

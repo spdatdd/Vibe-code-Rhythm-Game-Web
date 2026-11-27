@@ -1,3 +1,95 @@
+/** Ước lượng BPM (nội suy dưới mức khung) và pha phách chính từ đường bao flux. */
+function estimateBeatGrid(flux, fps) {
+  const minBpm = 70;
+  const maxBpm = 170;
+  const minLag = Math.max(4, Math.floor((60 / maxBpm) * fps));
+  const maxLag = Math.min(Math.floor(flux.length / 3), Math.ceil((60 / minBpm) * fps));
+  if (maxLag <= minLag) return null;
+
+  let mean = 0;
+  for (let i = 0; i < flux.length; i++) mean += flux[i];
+  mean /= flux.length;
+  const centered = new Float32Array(flux.length);
+  for (let i = 0; i < flux.length; i++) centered[i] = Math.max(0, flux[i] - mean * 0.85);
+
+  const scores = new Float64Array(maxLag + 1);
+  let bestLag = 0;
+  let bestScore = -Infinity;
+  let scoreSum = 0;
+  let scoreCount = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let corr = 0;
+    const limit = centered.length - lag;
+    for (let i = 0; i < limit; i++) {
+      corr += centered[i] * centered[i + lag];
+    }
+    const bpm = (60 * fps) / lag;
+    const tempoPrior = Math.exp(-0.5 * (Math.log2(bpm / 118) / 0.45) ** 2);
+    const score = (corr / limit) * (0.65 + 0.35 * tempoPrior);
+    scores[lag] = score;
+    scoreSum += score;
+    scoreCount++;
+    if (score > bestScore) {
+      bestScore = score;
+      bestLag = lag;
+    }
+  }
+  const meanScore = scoreCount ? scoreSum / scoreCount : 0;
+  // Chỉ dùng lưới phách toàn cục khi bài hát có nhịp đều rõ rệt (tránh lệch pha ở nhạc rubato).
+  if (!bestLag || meanScore <= 0 || bestScore / meanScore < 3.2) return null;
+
+  // Nội suy parabol quanh đỉnh để lấy chu kỳ phách chính xác dưới 1 khung hình.
+  let refinedLag = bestLag;
+  if (bestLag > minLag && bestLag < maxLag) {
+    const s0 = scores[bestLag - 1];
+    const s1 = scores[bestLag];
+    const s2 = scores[bestLag + 1];
+    const denom = s0 - 2 * s1 + s2;
+    if (denom < -1e-12) {
+      refinedLag = bestLag + 0.5 * (s0 - s2) / denom;
+    }
+  }
+
+  const beatSec = refinedLag / fps;
+  let bestPhase = 0;
+  let bestPhaseScore = -Infinity;
+  const phaseSteps = Math.max(16, Math.round(refinedLag));
+  for (let p = 0; p < phaseSteps; p++) {
+    const offsetFrames = (p / phaseSteps) * refinedLag;
+    let score = 0;
+    for (let pos = offsetFrames; pos < centered.length; pos += refinedLag) {
+      const i = Math.round(pos);
+      if (i >= 0 && i < centered.length) {
+        const prev = i > 0 ? centered[i - 1] * 0.5 : 0;
+        const next = i + 1 < centered.length ? centered[i + 1] * 0.5 : 0;
+        score += centered[i] + prev + next;
+      }
+    }
+    if (score > bestPhaseScore) {
+      bestPhaseScore = score;
+      bestPhase = offsetFrames;
+    }
+  }
+  return {
+    bpm: Number((60 / beatSec).toFixed(2)),
+    beatSec,
+    beatOffset: Number((bestPhase / fps).toFixed(4)),
+  };
+}
+
+/** Tính độ khớp của thời điểm t với lưới phách / nửa phách (0..1). */
+function computeBeatScore(t, beatGrid) {
+  if (!beatGrid) return 0;
+  const halfBeat = beatGrid.beatSec / 2;
+  const rel = ((t - beatGrid.beatOffset) % halfBeat + halfBeat) % halfBeat;
+  const dist = Math.min(rel, halfBeat - rel);
+  if (dist > 0.065) return 0;
+  const beatRel = ((t - beatGrid.beatOffset) % beatGrid.beatSec + beatGrid.beatSec) % beatGrid.beatSec;
+  const isMainBeat = Math.min(beatRel, beatGrid.beatSec - beatRel) <= 0.065;
+  const closeness = 1 - dist / 0.065;
+  return Number((closeness * (isMainBeat ? 1 : 0.65)).toFixed(3));
+}
+
 /** Phân tích mảng PCM đơn kênh trên trình duyệt để tìm các điểm khởi âm (onset). */
 export function analyzeChannelData(samples, sampleRate) {
   if (!samples?.length || !sampleRate) {
@@ -16,7 +108,6 @@ export function analyzeChannelData(samples, sampleRate) {
   }
 
   let peak = 0;
-  const lowBand = new Float32Array(frameCount);
   const highBand = new Float32Array(frameCount);
   const totalEnergy = new Float32Array(frameCount);
 
@@ -34,11 +125,8 @@ export function analyzeChannelData(samples, sampleRate) {
       diffSq += d * d;
       prev = s;
     }
-    const rms = Math.sqrt(sumSq / frameSize);
-    const hf = Math.sqrt(diffSq / frameSize);
-    totalEnergy[f] = rms;
-    highBand[f] = hf;
-    lowBand[f] = Math.max(0, rms - hf * 0.35);
+    totalEnergy[f] = Math.sqrt(sumSq / frameSize);
+    highBand[f] = Math.sqrt(diffSq / frameSize);
   }
 
   if (peak < 0.0005) {
@@ -52,6 +140,9 @@ export function analyzeChannelData(samples, sampleRate) {
     const dHigh = Math.max(0, highBand[f] - highBand[f - 1]);
     flux[f] = dTotal + dHigh * 0.65;
   }
+
+  const fps = sampleRate / hop;
+  const beatGrid = estimateBeatGrid(flux, fps);
 
   // Ngưỡng thích nghi cục bộ bằng trung bình trượt 2 chiều.
   const windowHalf = 10;
@@ -84,18 +175,30 @@ export function analyzeChannelData(samples, sampleRate) {
   const scale = strengths[Math.floor(strengths.length * 0.9)] || 1;
   const events = [];
 
-  for (const frame of rawPeaks) {
-    const time = (frame * hop) / sampleRate;
+  for (const peakFrame of rawPeaks) {
+    // Lùi về chân khởi âm trước đỉnh flux (tối đa ~24 ms) để khớp đúng thời điểm bắt đầu nốt.
+    let onsetFrame = peakFrame;
+    const backtrackLimit = Math.max(1, peakFrame - 2);
+    while (onsetFrame > backtrackLimit && flux[onsetFrame - 1] < flux[onsetFrame]) {
+      onsetFrame--;
+    }
+    const time = (onsetFrame * hop) / sampleRate;
     if (time < 0.05 || time > duration - 0.15) continue;
-    const brightnessRatio = highBand[frame] / Math.max(totalEnergy[frame], 0.0001);
+    const brightnessRatio = highBand[peakFrame] / Math.max(totalEnergy[peakFrame], 0.0001);
     events.push({
       time: Number(time.toFixed(5)),
-      strength: Number(Math.min(1, flux[frame] / Math.max(scale, 0.00001)).toFixed(4)),
+      strength: Number(Math.min(1, flux[peakFrame] / Math.max(scale, 0.00001)).toFixed(4)),
       brightness: Number((brightnessRatio * 1000).toFixed(2)),
+      beatScore: computeBeatScore(time, beatGrid),
     });
   }
 
-  return { duration: Number(duration.toFixed(5)), events };
+  return {
+    duration: Number(duration.toFixed(5)),
+    bpm: beatGrid?.bpm || null,
+    beatOffset: beatGrid?.beatOffset ?? null,
+    events,
+  };
 }
 
 /** Trộn các kênh của AudioBuffer sang mono và phân tích bản đồ nốt trực tiếp trên thiết bị. */

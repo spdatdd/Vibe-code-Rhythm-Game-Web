@@ -40,7 +40,6 @@ export function loadSettings(storage = globalThis.localStorage) {
     renderMode: '2d',
     playMode: 'standard',
     scrollSpeed: 1.0,
-    hitsound: true,
     demoId: 'neon-drift',
   };
   try {
@@ -53,7 +52,6 @@ export function loadSettings(storage = globalThis.localStorage) {
       renderMode: normalizeRenderMode(saved.renderMode),
       playMode: normalizePlayMode(saved.playMode),
       scrollSpeed: Number.isFinite(saved.scrollSpeed) ? clampScrollSpeed(saved.scrollSpeed) : 1.0,
-      hitsound: typeof saved.hitsound === 'boolean' ? saved.hitsound : true,
       demoId: typeof saved.demoId === 'string' && saved.demoId ? saved.demoId : 'neon-drift',
     };
   } catch {
@@ -71,7 +69,6 @@ export function saveSettings(settings, storage = globalThis.localStorage) {
       renderMode: normalizeRenderMode(settings.renderMode),
       playMode: normalizePlayMode(settings.playMode),
       scrollSpeed: clampScrollSpeed(settings.scrollSpeed ?? 1.0),
-      hitsound: typeof settings.hitsound === 'boolean' ? settings.hitsound : true,
       demoId: typeof settings.demoId === 'string' && settings.demoId ? settings.demoId : 'neon-drift',
     }));
     return true;
