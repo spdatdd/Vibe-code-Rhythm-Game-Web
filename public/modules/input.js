@@ -2,7 +2,7 @@ import { createView, laneAt } from '../stage3d.js';
 import { laneAt2D } from './renderer2d.js';
 
 /** Gắn sự kiện bàn phím, chuột và cảm ứng đa điểm vào cùng bộ điều khiển cột cho 2D và 3D. */
-export function setupInputs({ stage, laneKeys, getRenderMode, isBlocked, isGamepadHeld, onStrike, onPause }) {
+export function setupInputs({ stage, laneKeys, getRenderMode, isBlocked, onStrike, onPause }) {
   const keys = new Set();
   const pointers = new Map();
 
@@ -11,12 +11,8 @@ export function setupInputs({ stage, laneKeys, getRenderMode, isBlocked, isGamep
     pointers.clear();
   }
 
-  function isKeyboardOrPointerHeld(lane) {
-    return keys.has(laneKeys[lane]) || [...pointers.values()].includes(lane);
-  }
-
   function isLaneHeld(lane) {
-    return isKeyboardOrPointerHeld(lane) || isGamepadHeld(lane);
+    return keys.has(laneKeys[lane]) || [...pointers.values()].includes(lane);
   }
 
   stage.addEventListener('pointerdown', event => {
@@ -67,5 +63,5 @@ export function setupInputs({ stage, laneKeys, getRenderMode, isBlocked, isGamep
     keys.delete(event.code);
   });
 
-  return { clear, isKeyboardOrPointerHeld, isLaneHeld };
+  return { clear, isLaneHeld };
 }

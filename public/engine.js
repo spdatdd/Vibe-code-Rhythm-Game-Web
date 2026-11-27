@@ -1,37 +1,6 @@
 // Bốn phím tương ứng với các cột đàn từ trái sang phải.
 export const LANE_KEYS = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
 
-// Danh sách các bài Demo tích hợp sẵn với BPM và giai điệu riêng.
-export const DEMO_TRACKS = [
-  {
-    id: 'neon-drift',
-    title: 'Neon Drift',
-    bpm: 120,
-    offset: 2,
-    duration: 48,
-    melody: [261.63, 329.63, 392.0, 493.88, 440.0, 392.0, 329.63, 293.66],
-    bass: [65.41, 82.41],
-  },
-  {
-    id: 'midnight-pulse',
-    title: 'Midnight Pulse',
-    bpm: 96,
-    offset: 2,
-    duration: 40,
-    melody: [220.0, 261.63, 329.63, 392.0, 349.23, 329.63, 293.66, 246.94],
-    bass: [55.0, 65.41],
-  },
-  {
-    id: 'hyper-orbit',
-    title: 'Hyper Orbit',
-    bpm: 148,
-    offset: 2,
-    duration: 45,
-    melody: [293.66, 349.23, 440.0, 523.25, 587.33, 523.25, 440.0, 392.0],
-    bass: [73.42, 87.31],
-  },
-];
-
 // Quy đổi độ chính xác và trạng thái hoàn thành sang Rank và số sao (0–3).
 export function calculateRank(accuracy, failed = false) {
   if (failed) return { rank: 'F', stars: 0 };

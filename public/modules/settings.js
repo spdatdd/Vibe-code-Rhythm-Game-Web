@@ -33,7 +33,6 @@ export function loadSettings(storage = globalThis.localStorage) {
     audioOffsetMs: 0,
     renderMode: '2d',
     scrollSpeed: 1.0,
-    demoId: 'neon-drift',
   };
   try {
     const saved = JSON.parse(storage?.getItem(STORAGE_KEY) || 'null');
@@ -44,7 +43,6 @@ export function loadSettings(storage = globalThis.localStorage) {
       audioOffsetMs: Number.isFinite(saved.audioOffsetMs) ? clampOffsetMs(saved.audioOffsetMs) : 0,
       renderMode: normalizeRenderMode(saved.renderMode),
       scrollSpeed: Number.isFinite(saved.scrollSpeed) ? clampScrollSpeed(saved.scrollSpeed) : 1.0,
-      demoId: typeof saved.demoId === 'string' && saved.demoId ? saved.demoId : 'neon-drift',
     };
   } catch {
     return defaults;
@@ -60,7 +58,6 @@ export function saveSettings(settings, storage = globalThis.localStorage) {
       audioOffsetMs: clampOffsetMs(settings.audioOffsetMs),
       renderMode: normalizeRenderMode(settings.renderMode),
       scrollSpeed: clampScrollSpeed(settings.scrollSpeed ?? 1.0),
-      demoId: typeof settings.demoId === 'string' && settings.demoId ? settings.demoId : 'neon-drift',
     }));
     return true;
   } catch {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { videoId, makeChart, judge, award, findNote, LANE_KEYS, DEMO_TRACKS, calculateRank, calibrateBeats, buildAnalyzedChart } from '../public/engine.js';
+import { videoId, makeChart, judge, award, findNote, LANE_KEYS, calculateRank, calibrateBeats, buildAnalyzedChart } from '../public/engine.js';
 import { createView, project, laneAt, LANE_WIDTH, RUNWAY_HALF_WIDTH, PAD_HEIGHT, PAD_FRONT_Z, PAD_BACK_Z } from '../public/stage3d.js';
 import { audioAsset, pruneCache } from '../analysis/cache.mjs';
 import {
@@ -176,7 +176,7 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     setItem: (key, value) => store.set(key, value),
   };
   assert.equal(
-    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'hard', audioOffsetMs: 35, renderMode: '3d', scrollSpeed: 1.4, demoId: 'hyper-orbit' }, mockStorage),
+    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'hard', audioOffsetMs: 35, renderMode: '3d', scrollSpeed: 1.4 }, mockStorage),
     true,
   );
   assert.deepEqual(loadSettings(mockStorage), {
@@ -185,7 +185,6 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     audioOffsetMs: 35,
     renderMode: '3d',
     scrollSpeed: 1.4,
-    demoId: 'hyper-orbit',
   });
   assert.deepEqual(loadSettings({ getItem: () => '{broken' }), {
     url: '',
@@ -193,16 +192,11 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     audioOffsetMs: 0,
     renderMode: '2d',
     scrollSpeed: 1.0,
-    demoId: 'neon-drift',
   });
 });
 
-// Kiểm tra danh sách bài demo, tính Rank/sao, lưu kỷ lục và nốt đôi ở mức Khó.
-test('Demo tracks, tính Rank/sao, lưu kỷ lục và hợp âm mức Khó', () => {
-  assert.ok(DEMO_TRACKS.length >= 3);
-  for (const track of DEMO_TRACKS) {
-    assert.ok(track.bpm >= 60 && track.duration >= 30 && track.melody.length >= 4);
-  }
+// Kiểm tra tính Rank/sao, lưu kỷ lục và nốt đôi ở mức Khó.
+test('Tính Rank/sao, lưu kỷ lục và hợp âm mức Khó', () => {
   assert.deepEqual(calculateRank(96, false), { rank: 'S', stars: 3 });
   assert.deepEqual(calculateRank(88, false), { rank: 'A', stars: 2 });
   assert.deepEqual(calculateRank(75, false), { rank: 'B', stars: 1 });

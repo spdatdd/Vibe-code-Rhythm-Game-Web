@@ -1,5 +1,4 @@
-import { LANE_KEYS, DEMO_TRACKS, calculateRank, videoId, makeChart, judge, award, findNote, buildAnalyzedChart } from './engine.js';
-import { setupGamepad } from './gamepad.js';
+import { LANE_KEYS, calculateRank, videoId, judge, award, findNote, buildAnalyzedChart } from './engine.js';
 import {
   loadSettings,
   saveSettings,
@@ -29,16 +28,11 @@ const activeHolds = new Map();
 const MAX_MISSES = 5;
 
 let difficulty = 'normal', renderMode = '2d', scrollSpeed = 1.0, audioOffsetMs = 0;
-let demoId = DEMO_TRACKS[0].id;
-let source = 'demo', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
+let source = 'local', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
 let localTrack = null, localBuffer = null;
 let prepareVersion = 0, prepareAbort = null, pasteTimer = null;
-let screen = 'loading', mode = 'idle', chart = [], duration = DEMO_TRACKS[0].duration, stats, anchor = 0, elapsed = 0;
+let screen = 'loading', mode = 'idle', chart = [], duration = 0, stats, anchor = 0, elapsed = 0;
 let nextMissIndex = 0, resumeGraceUntil = 0, feedback = '', feedbackUntil = 0;
-
-function selectedDemo() {
-  return DEMO_TRACKS.find(item => item.id === demoId) || DEMO_TRACKS[0];
-}
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = createAudioEngine({ onBufferEnded: () => { if (mode === 'playing') finish(); } });
@@ -63,15 +57,11 @@ function activeRenderer() {
   }
   return renderer2d;
 }
-const gamepad = setupGamepad($('gamepad-panel'), laneLabels, lane => {
-  if (!inputs.isKeyboardOrPointerHeld(lane)) strike(lane);
-});
 const inputs = setupInputs({
   stage,
   laneKeys: LANE_KEYS,
   getRenderMode: () => renderMode,
   isBlocked: () => screen !== 'game' || mode !== 'playing',
-  isGamepadHeld: lane => gamepad.isHeld(lane),
   onStrike: strike,
   onPause: () => { if (screen === 'game' && ['playing', 'paused'].includes(mode)) togglePause(); },
 });
@@ -85,43 +75,12 @@ function persistSettings() {
     audioOffsetMs,
     renderMode,
     scrollSpeed,
-    demoId,
   });
 }
 
 function getRecordKey() {
-  const trackKey = source === 'demo' ? demoId : source === 'local' ? (localTrack?.title || 'local') : (loadedId || 'youtube');
+  const trackKey = source === 'local' ? (localTrack?.title || 'local') : (loadedId || 'youtube');
   return `${source}:${trackKey}:${difficulty}`;
-}
-
-function renderDemoList() {
-  const list = $('demo-list');
-  const records = loadRecords();
-  list.innerHTML = '';
-  for (const track of DEMO_TRACKS) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `demo-tile${track.id === demoId ? ' selected' : ''}`;
-    btn.dataset.demoId = track.id;
-    const rec = records[`demo:${track.id}:${difficulty}`];
-    const recText = rec ? `${rec.rank} · ${rec.score.toLocaleString('vi-VN')}` : '';
-    btn.innerHTML = `
-      <div class="vinyl"></div>
-      <div class="demo-tile-info">
-        <strong>${track.title}</strong>
-        <span>${formatTime(track.duration)} · ${track.bpm} BPM</span>
-      </div>
-      ${recText ? `<span class="demo-record">${recText}</span>` : ''}
-    `;
-    btn.addEventListener('click', () => {
-      if (['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
-      demoId = track.id;
-      persistSettings();
-      renderDemoList();
-      resetRound();
-    });
-    list.appendChild(btn);
-  }
 }
 function time() { return mode === 'playing' ? audio.outputClock() - anchor - audioOffsetMs / 1000 : elapsed; }
 
@@ -147,16 +106,13 @@ function updateScore() {
 
 function resetRound() {
   const custom = activePrepared();
-  const demo = selectedDemo();
-  duration = source === 'demo' ? demo.duration : custom ? custom.data.duration : 0;
-  chart = source === 'demo'
-    ? makeChart({ ...demo, difficulty })
-    : custom
-      ? buildAnalyzedChart(custom.data.events, difficulty, duration, { allowChords: difficulty === 'hard' })
-      : [];
+  duration = custom ? custom.data.duration : 0;
+  chart = custom
+    ? buildAnalyzedChart(custom.data.events, difficulty, duration, { allowChords: difficulty === 'hard' })
+    : [];
   stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0, misses: 0 };
   elapsed = 0; nextMissIndex = 0; resumeGraceUntil = 0; feedback = '';
-  audio.resetDemoBeat(-1); activeHolds.clear(); inputs.clear(); renderer2d.clearEffects(); renderer3d?.clearEffects();
+  activeHolds.clear(); inputs.clear(); renderer2d.clearEffects(); renderer3d?.clearEffects();
   $('note-count').textContent = `${chart.length} nốt`;
   $('progress').style.width = '0%';
   updateScore();
@@ -166,14 +122,12 @@ function setMode(next) {
   mode = next;
   const active = ['playing', 'paused', 'waiting'].includes(mode);
   const preparing = mode === 'preparing';
-  gamepad.setLocked(active || preparing);
   for (const button of difficultyButtons) button.disabled = active || preparing;
   for (const button of renderModeButtons) button.disabled = active || preparing;
-  for (const btn of $('demo-list').querySelectorAll('button')) btn.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
-  for (const id of ['demo-tab', 'local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
+  for (const id of ['local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
   $('youtube-tab').disabled ||= !analysisAvailable;
-  $('start').disabled = active || preparing || (source !== 'demo' && !activePrepared());
+  $('start').disabled = active || preparing || !activePrepared();
   $('cancel-prepare').hidden = !preparing;
   $('pause-overlay').hidden = mode !== 'paused';
   $('result-overlay').hidden = mode !== 'ended';
@@ -181,18 +135,17 @@ function setMode(next) {
 
 function updateGameHeader() {
   const diffLabel = { normal: 'THƯỜNG', hard: 'KHÓ' }[difficulty] || 'THƯỜNG';
-  const title = source === 'demo'
-    ? selectedDemo().title.toUpperCase()
-    : source === 'local'
-      ? (localTrack?.title || 'NHẠC THIẾT BỊ')
-      : (prepared?.title || 'YOUTUBE');
+  const title = source === 'local'
+    ? (localTrack?.title || 'NHẠC THIẾT BỊ')
+    : (prepared?.title || 'YOUTUBE');
   $('game-title').textContent = title;
   $('game-meta').textContent = `${diffLabel} · ${chart.length} NỐT`;
 }
 
 async function start() {
   if (['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
-  if (source !== 'demo' && !activePrepared()) {
+  const custom = activePrepared();
+  if (!custom) {
     setStatus(source === 'local' ? 'Hãy chọn một tệp nhạc từ thiết bị trước khi chơi.' : 'Hãy phân tích bài nhạc YouTube trước khi chơi.');
     return;
   }
@@ -203,13 +156,8 @@ async function start() {
   setMode('waiting');
   try {
     await audio.ensureRunning();
-    const custom = activePrepared();
-    if (custom) {
-      elapsed = -2;
-      anchor = audio.playBuffer(custom.buffer, -2);
-    } else {
-      anchor = audio.currentTime() + .08;
-    }
+    elapsed = -2;
+    anchor = audio.playBuffer(custom.buffer, -2);
     setMode('playing');
     stage.focus();
   } catch {
@@ -223,7 +171,6 @@ async function togglePause() {
   if (mode === 'playing') {
     elapsed = time();
     audio.stopBuffer();
-    audio.stopSynth();
     inputs.clear();
     $('pause-subtitle').textContent = `${$('game-title').textContent} · ${stats.score.toLocaleString('vi-VN')} điểm`;
     setMode('paused');
@@ -231,13 +178,8 @@ async function togglePause() {
     try {
       await audio.ensureRunning();
       const custom = activePrepared();
-      if (custom) {
-        anchor = audio.playBuffer(custom.buffer, elapsed);
-      } else {
-        const demo = selectedDemo();
-        anchor = audio.outputClock() - audioOffsetMs / 1000 - elapsed;
-        audio.resetDemoBeat(Math.floor(((audio.currentTime() - anchor) - demo.offset % (60 / demo.bpm)) / (60 / demo.bpm)));
-      }
+      if (!custom) return;
+      anchor = audio.playBuffer(custom.buffer, elapsed);
       if (activeHolds.size) resumeGraceUntil = performance.now() + 450;
       setMode('playing');
       stage.focus();
@@ -252,7 +194,6 @@ function finish(failed = false) {
   for (const note of chart) if (note.state === 'pending' || note.state === 'holding') { note.state = 'miss'; award(stats, 'MISS'); }
   elapsed = failed ? time() : duration;
   audio.stopBuffer();
-  audio.stopSynth();
   updateScore();
   const acc = Math.round(stats.weight / stats.judged * 100) || 0;
   const { rank, stars } = calculateRank(acc, failed);
@@ -268,12 +209,10 @@ function finish(failed = false) {
   $('result-combo').textContent = `${stats.maxCombo}×`;
   $('result-accuracy').textContent = `${acc}%`;
   setMode('ended');
-  renderDemoList();
 }
 
 function returnToMenu() {
   audio.stopBuffer();
-  audio.stopSynth();
   resetRound();
   setMode('idle');
   showScreen('menu');
@@ -281,7 +220,6 @@ function returnToMenu() {
 
 async function restartRound() {
   audio.stopBuffer();
-  audio.stopSynth();
   setMode('idle');
   await start();
 }
@@ -408,16 +346,13 @@ function selectSource(next) {
   if ((next === 'youtube' && !analysisAvailable) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
   clearTimeout(pasteTimer);
   source = next;
-  $('demo-tab').classList.toggle('selected', next === 'demo');
   $('local-tab').classList.toggle('selected', next === 'local');
   $('youtube-tab').classList.toggle('selected', next === 'youtube');
-  $('demo-panel').hidden = next !== 'demo';
   $('local-panel').hidden = next !== 'local';
   $('youtube-panel').hidden = next !== 'youtube';
   resetRound();
   setMode('idle');
-  if (next === 'demo') setStatus('Nhạc demo đã sẵn sàng.');
-  else if (next === 'local') setStatus(localTrack ? `Đã nạp "${localTrack.title}".` : 'Chọn tệp nhạc từ thiết bị để tự động tạo bản đồ nốt.');
+  if (next === 'local') setStatus(localTrack ? `Đã nạp "${localTrack.title}".` : 'Chọn tệp nhạc từ thiết bị để tự động tạo bản đồ nốt.');
   else setStatus(prepared ? `Đã sẵn sàng "${prepared.title}".` : 'Dán link YouTube để phân tích trước khi chơi.');
 }
 
@@ -426,7 +361,6 @@ function selectDifficulty(next) {
   difficulty = normalizeDifficulty(next);
   for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
   persistSettings();
-  renderDemoList();
   resetRound();
 }
 
@@ -452,11 +386,9 @@ function setAudioOffset(value) {
 }
 
 function frame() {
-  gamepad.poll();
   if (screen === 'game') {
     let t = time();
     if (mode === 'playing') {
-      if (source === 'demo') audio.scheduleDemo(audio.currentTime() - anchor, anchor, selectedDemo());
       const inGrace = performance.now() < resumeGraceUntil;
       for (const [lane, holdNote] of activeHolds) {
         if (mode !== 'playing') break;
@@ -486,7 +418,6 @@ $('restart-btn').addEventListener('click', restartRound);
 $('menu-btn').addEventListener('click', returnToMenu);
 $('result-restart-btn').addEventListener('click', restartRound);
 $('result-menu-btn').addEventListener('click', returnToMenu);
-$('demo-tab').addEventListener('click', () => selectSource('demo'));
 $('local-tab').addEventListener('click', () => selectSource('local'));
 $('youtube-tab').addEventListener('click', () => selectSource('youtube'));
 $('load-video').addEventListener('click', loadVideo);
@@ -515,12 +446,10 @@ dropZone.addEventListener('drop', event => {
 const saved = loadSettings();
 $('video-url').value = saved.url;
 difficulty = saved.difficulty;
-demoId = DEMO_TRACKS.some(t => t.id === saved.demoId) ? saved.demoId : DEMO_TRACKS[0].id;
 for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
 selectRenderMode(saved.renderMode);
 setScrollSpeed(saved.scrollSpeed);
 setAudioOffset(saved.audioOffsetMs);
-renderDemoList();
 
 async function bootstrap() {
   showScreen('loading');

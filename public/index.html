@@ -30,16 +30,11 @@
         <!-- Chọn nguồn nhạc -->
         <section class="ios-card">
           <div class="tabs source-tabs" role="tablist" aria-label="Nguồn nhạc">
-            <button id="demo-tab" type="button" class="selected">Demo</button>
-            <button id="local-tab" type="button">Thiết bị</button>
+            <button id="local-tab" type="button" class="selected">Thiết bị</button>
             <button id="youtube-tab" type="button" disabled>YouTube</button>
           </div>
 
-          <div id="demo-panel">
-            <div id="demo-list" class="demo-list" role="group" aria-label="Danh sách nhạc demo"></div>
-          </div>
-
-          <div id="local-panel" hidden>
+          <div id="local-panel">
             <label class="file-drop" for="local-file">
               <span class="file-icon">♫</span>
               <strong>Chọn bài hát</strong>
@@ -100,26 +95,6 @@
             <output id="offset-value" for="audio-offset">0 ms</output>
           </div>
           <input id="audio-offset" type="range" min="-200" max="200" step="5" value="0">
-        </section>
-
-        <!-- Tay cầm gọn -->
-        <section class="ios-card" id="gamepad-panel">
-          <div class="row-head">
-            <span>Tay cầm</span>
-            <span class="hint" role="status"></span>
-          </div>
-          <fieldset disabled aria-label="Gán nút tay cầm">
-            <div class="fields">
-              <button type="button" data-lane="0">D · —</button>
-              <button type="button" data-lane="1">F · —</button>
-              <button type="button" data-lane="2">J · —</button>
-              <button type="button" data-lane="3">K · —</button>
-            </div>
-            <div class="gamepad-actions">
-              <button type="button" data-cancel hidden>Hủy</button>
-              <button type="button" data-clear>Xóa gán</button>
-            </div>
-          </fieldset>
         </section>
       </div>
 

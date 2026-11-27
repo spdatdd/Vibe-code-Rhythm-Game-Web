@@ -164,47 +164,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, .stage:focus-visible
 .difficulty-tabs, .mode-tabs { margin-top: 8px; }
 .mode-head { margin-top: 14px; }
 
-.demo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.demo-tile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1.5px solid transparent;
-  background: #f5f7fb;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-}
-.demo-tile.selected {
-  border-color: var(--accent);
-  background: linear-gradient(135deg, #eef4ff, #f6f0ff);
-}
-.demo-tile-info { flex: 1; min-width: 0; }
-.demo-record {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-soft);
-  padding: 3px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.vinyl {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: radial-gradient(circle, #ffffff 0 7px, var(--accent) 8px 12px, #1e293b 13px 100%);
-}
-.demo-tile strong { display: block; font-size: 14px; color: var(--ink); }
-.demo-tile span { font-size: 12px; color: var(--muted); }
 .result-rank-row {
   display: flex;
   align-items: center;
@@ -285,12 +244,6 @@ input:not([type=range]) {
 .offset-head output { font: 12px monospace; color: var(--accent); }
 input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0 0; }
 .hint { font-size: 11px; font-weight: 400; color: var(--muted); margin: 0; text-align: right; }
-
-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-#gamepad-panel button { padding: 8px 4px; font-size: 11px; border-radius: 10px; }
-#gamepad-panel [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.gamepad-actions { display: flex; gap: 6px; margin-top: 8px; }
 
 .menu-footer { padding-top: 2px; }
 .status-line { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 10px; min-height: 18px; }

@@ -8,10 +8,6 @@ Nhấp đúp `Start-Game.cmd`, giữ cửa sổ server mở rồi truy cập **h
 Hoặc chạy `node server.mjs` trong thư mục dự án. Máy chủ chỉ lắng nghe trên máy hiện tại.
 Nếu vừa cập nhật server, tắt cửa sổ server cũ bằng Ctrl+C rồi chạy lại.
 
-## Chơi bằng tay cầm
-
-Kết nối USB hoặc Bluetooth rồi bấm một nút để trình duyệt nhận tay cầm. Trong mục **Tay cầm**, chọn từng cột **D, F, J, K** và bấm nút vật lý muốn gán. Game lưu cấu hình theo mẫu tay cầm trong trình duyệt. Tay cầm dùng chung cách chấm điểm với bàn phím và cảm ứng. Khi đánh nốt dài trong demo, giữ nút đến hết đuôi.
-
 ## Chạy cả game và phân tích YouTube với Netlify và Render
 
 **Render Free** chạy Node.js, Python và FFmpeg trong Docker. **Netlify Free theo credit** phục vụ giao diện và chuyển các yêu cầu `/api/*` tới Render qua Netlify Server. Repo GitHub có thể giữ riêng tư.
@@ -30,7 +26,7 @@ Render Free ngủ sau 15 phút không có lưu lượng. Lần đầu dán link 
 2. Chờ các bước **tải âm thanh → chuẩn hóa → dò điểm khởi âm → nạp âm thanh vào bộ nhớ**.
 3. Chỉ khi cả âm thanh và bản đồ nốt đã xong, nút **Bắt đầu chơi** mới được mở.
 4. Bấm bắt đầu. Có hai giây đếm vào trước khi âm thanh phát.
-5. Dùng D/F/J/K, tay cầm, chuột hoặc cảm ứng để đánh đúng cột tại vạch sáng. Esc tạm dừng. **Dừng lượt** để đổi bài.
+5. Dùng D/F/J/K, chuột hoặc cảm ứng để đánh đúng cột tại vạch sáng. Esc tạm dừng. **Dừng lượt** để đổi bài.
 
 Vị trí nốt dùng trực tiếp từng thời điểm khởi âm trong bản thu. Game dùng mật độ nốt mặc định và gán cột theo độ sáng phổ. Cả chart tự động (YouTube, tệp nhạc) và demo đều hỗ trợ nốt đơn và nốt giữ.
 
