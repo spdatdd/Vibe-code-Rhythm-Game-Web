@@ -1,4 +1,4 @@
-"""Chuẩn bị âm thanh và thời điểm onset cho game, xuất tiến độ JSON từng dòng."""
+"""Tải video YouTube, tách âm thanh nén + nền không tiếng và gọi bộ phân tích DSP."""
 import argparse
 import json
 import os
@@ -9,87 +9,34 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / '.tools' / 'python'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.setdefault('NUMBA_CACHE_DIR', str(ROOT / '.cache' / 'numba'))
 
-
-def report(stage, progress, message):
-    """Gửi trạng thái có cấu trúc để Node chuyển tới giao diện tiến độ."""
-    print(json.dumps({'stage': stage, 'progress': progress, 'message': message}, ensure_ascii=True), flush=True)
+from dsp import analyze, report
 
 
-def audio_features(wav_path, sr, hop):
-    """Tính phổ theo đoạn có chồng lấn để giữ giới hạn RAM và giữ đúng mốc thời gian."""
-    import librosa
-    import numpy as np
-    import soundfile as sf
-
-    with sf.SoundFile(str(wav_path)) as wave:
-        duration = len(wave) / wave.samplerate
-        if duration < 5:
-            raise ValueError('Âm thanh quá ngắn, không đủ dữ liệu để tạo màn chơi.')
-        frames = int(duration * sr / hop) + 1
-        envelope = np.empty(frames, dtype=np.float32)
-        centroid = np.empty(frames, dtype=np.float32)
-        peak_level = 0.0
-        chunk, margin = 1536, 64
-        for start in range(0, frames, chunk):
-            end = min(start + chunk, frames)
-            first = max(0, start - margin)
-            sample_start = round(first * hop * wave.samplerate / sr)
-            sample_end = min(len(wave), round((end + margin) * hop * wave.samplerate / sr))
-            wave.seek(sample_start)
-            signal = wave.read(sample_end - sample_start, dtype='float32', always_2d=True)
-            y = librosa.resample(signal.mean(axis=1), orig_sr=wave.samplerate, target_sr=sr)
-            peak_level = max(peak_level, float(np.max(np.abs(y))))
-            # Bỏ biên có đệm của mỗi đoạn, chỉ giữ vị trí thuộc đoạn chính.
-            region = slice(start - first, end - first)
-            envelope[start:end] = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)[region]
-            centroid[start:end] = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop)[0, region]
-        return duration, wave.samplerate, peak_level, envelope, centroid
-
-
-def analyze(wav_path):
-    """Dò điểm khởi âm thật trên phổ âm; không ép nốt vào lưới BPM cố định."""
-    import librosa
-    import numpy as np
-
-    sr, hop = 22050, 256
-    report('analyzing', 62, 'Đang tìm các thời điểm vang nốt trong bài…')
-    duration, sample_rate, peak_level, envelope, centroid = audio_features(wav_path, sr, hop)
-    if peak_level < .0001:
-        raise ValueError('Âm thanh im lặng, không đủ dữ liệu để tạo màn chơi.')
-    peaks = librosa.onset.onset_detect(onset_envelope=envelope, sr=sr, hop_length=hop,
-                                     backtrack=False, units='frames', delta=.06, wait=5)
-    # Lùi về đáy gần nhất trước đỉnh onset, tối đa 60 ms để tránh bắt đầu quá sớm.
-    backtracked = librosa.onset.onset_backtrack(peaks, envelope)
-    aligned = np.maximum(backtracked, peaks - 5)
-    report('analyzing', 78, 'Đang phân loại cường độ và tạo bản đồ nốt…')
-    strengths = envelope[peaks] if len(peaks) else np.array([])
-    scale = float(np.percentile(strengths, 90)) if len(strengths) else 1.0
-    events = []
-    for index, frame in enumerate(aligned):
-        seconds = float(frame * hop / sr)
-        if seconds < .05 or seconds > duration - .15:
-            continue
-        events.append({'time': round(seconds, 5),
-                       'strength': round(min(1.0, float(strengths[index]) / max(scale, .00001)), 4),
-                       'brightness': round(float(centroid[min(int(peaks[index]), len(centroid) - 1)]), 2)})
-    if len(events) < 8:
-        raise ValueError('Không tìm thấy đủ điểm khởi âm rõ ràng. Hãy thử bản nhạc khác.')
-    # BPM tham khảo dùng đoạn tối đa 45 giây quanh điểm khởi âm mạnh nhất.
-    # Mọi nốt trong game vẫn dùng thời gian đo được trên toàn bài.
-    tempo_window = 45 * sr // hop
-    tempo_start = max(0, min(len(envelope) - tempo_window, int(np.argmax(envelope)) - tempo_window // 2))
-    tempo, _ = librosa.beat.beat_track(onset_envelope=envelope[tempo_start:tempo_start + tempo_window],
-                                     sr=sr, hop_length=hop)
-    bpm = float(np.asarray(tempo).reshape(-1)[0])
-    confidence = round(float(np.mean(strengths > max(scale * .25, .00001))), 3)
-    return {'duration': round(duration, 5), 'bpm': round(bpm, 2), 'events': events,
-            'confidence': confidence, 'method': 'spectral-onset-v1', 'sampleRate': sample_rate}
+def create_background(ffmpeg, source, target, codec):
+    """Tạo MP4 chỉ có hình, giới hạn độ phân giải và bỏ track âm thanh."""
+    temporary = target.with_name('background-part.mp4')
+    encoding = ['-c:v', 'copy'] if codec.startswith('avc1') else [
+        '-vf', "scale=-2:'min(360,ih)',fps=24", '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-threads', '2',
+    ]
+    try:
+        subprocess.run([ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', str(source),
+                        '-map', '0:v:0', '-an', '-t', '600', *encoding,
+                        '-movflags', '+faststart', str(temporary)], check=True,
+                       timeout=180, capture_output=True)
+        temporary.replace(target)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def prepare(video_id, directory, node):
-    """Tải một video công khai, chuyển âm thanh sang PCM rồi phân tích cùng tệp phát."""
+    """Tải video công khai, tạo nền không tiếng và phân tích bản âm thanh dùng khi chơi."""
     import imageio_ffmpeg
     import yt_dlp
 
@@ -103,7 +50,7 @@ def prepare(video_id, directory, node):
         if data.get('status') == 'downloading':
             total = data.get('total_bytes') or data.get('total_bytes_estimate') or 0
             fraction = min(1, data.get('downloaded_bytes', 0) / total) if total else 0
-            report('downloading', round(10 + 30 * fraction), 'Đang tải âm thanh để phân tích…')
+            report('downloading', round(10 + 30 * fraction), 'Đang tải video và âm thanh…')
 
     def filter_video(info, *, incomplete=False):
         """Giới hạn video tối đa mười phút và từ chối livestream trước khi tải."""
@@ -113,7 +60,8 @@ def prepare(video_id, directory, node):
             return 'Bản thử nghiệm hỗ trợ video dài tối đa 10 phút.'
         return None
 
-    options = {'format': 'bestaudio/best', 'outtmpl': str(directory / 'source.%(ext)s'),
+    options = {'format': 'best[height<=360][ext=mp4][vcodec^=avc1]/best[height<=360]/bestaudio',
+               'outtmpl': str(directory / 'source.%(ext)s'),
                'noplaylist': True, 'quiet': True, 'noprogress': True, 'no_warnings': True, 'restrictfilenames': True,
                'socket_timeout': 25, 'retries': 2, 'fragment_retries': 2, 'max_filesize': 100 * 1024 * 1024,
                'match_filter': filter_video, 'progress_hooks': [progress_hook],
@@ -125,17 +73,45 @@ def prepare(video_id, directory, node):
         source_path = Path(downloader.prepare_filename(info))
         if not source_path.is_file():
             raise ValueError('Không tải được âm thanh. Video có thể bị giới hạn hoặc quá lớn.')
-    report('decoding', 45, 'Đang chuẩn hóa âm thanh dùng chung cho phân tích và phát nhạc…')
-    audio_path = directory / 'audio.wav'
-    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), '-nostdin', '-v', 'error', '-y', '-i', str(source_path),
-                    '-vn', '-t', '600', '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le', str(audio_path)],
-                   check=True, timeout=120, capture_output=True)
-    report('analyzing', 55, 'Đang khởi động bộ phân tích; lần đầu có thể mất vài phút…')
-    result = analyze(audio_path)
-    result.update({'videoId': video_id, 'title': info.get('title', video_id), 'version': 1})
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    report('decoding', 45, 'Đang chuẩn bị âm thanh nén và video nền…')
+    audio_path = directory / 'audio-v3.mp3'
+    analysis_wav = directory / 'analysis-part.wav'
+    try:
+        subprocess.run([
+            ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', str(source_path),
+            '-vn', '-t', '600', '-ar', '44100', '-ac', '2', '-c:a', 'libmp3lame', '-q:a', '2', str(audio_path),
+            '-vn', '-t', '600', '-ar', '22050', '-ac', '1', '-c:a', 'pcm_s16le', str(analysis_wav),
+        ], check=True, timeout=150, capture_output=True)
+        codec = info.get('vcodec') or 'none'
+        has_video = codec != 'none' and create_background(ffmpeg, source_path, directory / 'background.mp4', codec)
+        if not has_video:
+            report('decoding', 49, 'Đang tìm luồng hình riêng để làm nền…')
+            video_options = dict(options, format='bestvideo[height<=360]', outtmpl=str(directory / 'visual.%(ext)s'),
+                                 progress_hooks=[])
+            try:
+                with yt_dlp.YoutubeDL(video_options) as downloader:
+                    visual = downloader.extract_info('https://www.youtube.com/watch?v=' + video_id, download=True)
+                    if visual:
+                        visual_path = Path(downloader.prepare_filename(visual))
+                        try:
+                            if visual_path.is_file():
+                                has_video = create_background(ffmpeg, visual_path, directory / 'background.mp4',
+                                                              visual.get('vcodec') or '')
+                        finally:
+                            visual_path.unlink(missing_ok=True)
+            except yt_dlp.utils.DownloadError:
+                pass
+        report('analyzing', 55, 'Đang khởi động bộ phân tích; lần đầu có thể mất vài phút…')
+        result = analyze(analysis_wav)
+    finally:
+        analysis_wav.unlink(missing_ok=True)
+    result.update({'videoId': video_id, 'title': info.get('title', video_id), 'version': 3, 'hasVideo': has_video})
     temporary = directory / 'result.tmp'
     temporary.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
     temporary.replace(directory / 'result.json')
+    for legacy in ('audio.wav', 'audio-v2.wav'):
+        (directory / legacy).unlink(missing_ok=True)
     source_path.unlink(missing_ok=True)
     report('ready', 100, 'Đã phân tích xong. Đang nạp âm thanh vào game…')
 

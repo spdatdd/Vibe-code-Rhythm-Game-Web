@@ -1,7 +1,48 @@
 // Bốn phím tương ứng với các cột đàn từ trái sang phải.
 export const LANE_KEYS = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
+
+// Danh sách các bài Demo tích hợp sẵn với BPM và giai điệu riêng.
+export const DEMO_TRACKS = [
+  {
+    id: 'neon-drift',
+    title: 'Neon Drift',
+    bpm: 120,
+    offset: 2,
+    duration: 48,
+    melody: [261.63, 329.63, 392.0, 493.88, 440.0, 392.0, 329.63, 293.66],
+    bass: [65.41, 82.41],
+  },
+  {
+    id: 'midnight-pulse',
+    title: 'Midnight Pulse',
+    bpm: 96,
+    offset: 2,
+    duration: 40,
+    melody: [220.0, 261.63, 329.63, 392.0, 349.23, 329.63, 293.66, 246.94],
+    bass: [55.0, 65.41],
+  },
+  {
+    id: 'hyper-orbit',
+    title: 'Hyper Orbit',
+    bpm: 148,
+    offset: 2,
+    duration: 45,
+    melody: [293.66, 349.23, 440.0, 523.25, 587.33, 523.25, 440.0, 392.0],
+    bass: [73.42, 87.31],
+  },
+];
+
+// Quy đổi độ chính xác và trạng thái hoàn thành sang Rank và số sao (0–3).
+export function calculateRank(accuracy, failed = false) {
+  if (failed) return { rank: 'F', stars: 0 };
+  if (accuracy >= 95) return { rank: 'S', stars: 3 };
+  if (accuracy >= 85) return { rank: 'A', stars: 2 };
+  if (accuracy >= 70) return { rank: 'B', stars: 1 };
+  return { rank: 'C', stars: 0 };
+}
+
 // Tạo chart từ onset thật, chọn nốt nổi bật theo độ khó mà không dời timestamp.
-export function buildAnalyzedChart(events, difficulty, duration) {
+export function buildAnalyzedChart(events, difficulty, duration, { allowChords = false } = {}) {
   const gap = { easy: .42, normal: .25, hard: .14 }[difficulty] || .25;
   const threshold = { easy: .30, normal: .12, hard: .035 }[difficulty] || .12;
   const candidates = events.filter(event => Number.isFinite(event.time) && event.time >= 0 && event.time < duration - .1 && event.strength >= threshold);
@@ -13,8 +54,29 @@ export function buildAnalyzedChart(events, difficulty, duration) {
   selected.sort((a, b) => a.time - b.time);
   const brightness = selected.map(event => event.brightness).sort((a, b) => a - b);
   const boundaries = [.25, .5, .75].map(q => brightness[Math.floor((brightness.length - 1) * q)] || 0);
-  // Cột được phân theo độ sáng phổ để tạo biến thiên; không nhận là bản chép nốt piano.
-  return selected.map(event => ({ time: event.time, lane: boundaries.filter(value => event.brightness > value).length, hold: 0, state: 'pending' }));
+  // Phân cột theo độ sáng phổ, đổi cột khi lặp nhanh và tạo nốt giữ khi đủ khoảng trống.
+  let lastLane = -1, lastTime = -Infinity, notesSinceChord = 0;
+  const notes = [];
+  for (let index = 0; index < selected.length; index++) {
+    const event = selected[index];
+    let lane = boundaries.filter(value => event.brightness > value).length;
+    if (lane === lastLane && event.time - lastTime < .32) {
+      lane = lane === 0 ? 1 : lane === 3 ? 2 : index % 2 ? lane + 1 : lane - 1;
+    }
+    lastLane = lane;
+    lastTime = event.time;
+    const nextTime = index + 1 < selected.length ? selected[index + 1].time : duration - .15;
+    const maxHold = Math.min(1.6, nextTime - event.time - .2, duration - .2 - event.time);
+    const hold = maxHold >= .32 ? Number(maxHold.toFixed(3)) : 0;
+    notes.push({ time: event.time, lane, hold, state: 'pending' });
+    if (allowChords && difficulty === 'hard' && hold === 0 && event.strength >= .78 && notesSinceChord >= 3) {
+      notes.push({ time: event.time, lane: (lane + 2) % 4, hold: 0, state: 'pending' });
+      notesSinceChord = 0;
+    } else {
+      notesSinceChord++;
+    }
+  }
+  return notes;
 }
 // Đọc ID video hợp lệ từ URL YouTube thông dụng hoặc ID thuần.
 export function videoId(input) {
@@ -59,10 +121,15 @@ export function calibrateBeats(times) {
 }
 // Phân loại độ lệch thời gian theo cửa sổ chấm điểm tính bằng giây.
 export function judge(delta) { const d = Math.abs(delta); return d <= .065 ? 'PERFECT' : d <= .13 ? 'GREAT' : d <= .19 ? 'GOOD' : null; }
-// Tìm nốt gần nhất trong đúng cột và trong cửa sổ chấm điểm.
+// Tìm nốt pending sớm nhất trong đúng cột và nằm trong cửa sổ chấm điểm.
 export function findNote(notes, lane, time) {
-  return notes.filter(note => note.state === 'pending' && note.lane === lane && judge(time - note.time))
-    .sort((a, b) => Math.abs(a.time - time) - Math.abs(b.time - time))[0];
+  let earliest;
+  for (const note of notes) {
+    if (note.state === 'pending' && note.lane === lane && judge(time - note.time)) {
+      if (!earliest || note.time < earliest.time) earliest = note;
+    }
+  }
+  return earliest;
 }
 // Cập nhật điểm, combo và tổng trọng số chính xác sau một nốt đã kết thúc.
 export function award(stats, rating) {

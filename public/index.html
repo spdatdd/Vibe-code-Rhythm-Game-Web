@@ -1,31 +1,213 @@
 <!doctype html>
 <html lang="vi">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ORBIT — Rhythm Lab</title><link rel="stylesheet" href="style.css"></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>ORBIT — Piano Tiles 3D</title>
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
-<!-- Thanh thương hiệu và trạng thái của phòng thực hành rhythm. -->
-<header><a class="brand" href="/">◉ <strong>ORBIT<span> / RHYTHM LAB</span></strong></a><div class="local"><i></i> LOCAL PLAYGROUND <span>V.01</span></div></header>
-<main>
-<section class="intro"><div><p class="eyebrow">FEEL THE SOUND. FIND YOUR ORBIT.</p><h1>Đưa âm nhạc vào <em>quỹ đạo.</em></h1><p>Bốn cột phím đàn. Những ô nhạc rơi. Chạm đúng nhịp.</p></div><div class="edition">01 <span>EXPERIMENTAL<br>RHYTHM EXPERIENCE</span></div></section>
-<div class="layout">
-<!-- Sân chơi canvas, bảng điểm và các nút điều khiển trận đấu. -->
-<section class="arena-panel"><div class="arena-top"><span><i class="dot"></i> <b id="mode-label">NEON DRIFT</b> <small id="source-label">/ DEMO ORIGINAL</small></span><span id="phase">SẴN SÀNG</span></div>
-<div class="stats"><div><small>ĐIỂM SỐ</small><strong id="score">000000</strong></div><div><small>COMBO</small><strong id="combo">0<span>×</span></strong></div><div><small>CHÍNH XÁC</small><strong id="accuracy">—</strong></div></div>
-<div class="stage" tabindex="0" aria-label="Sân chơi Piano Tiles. Bấm D F J K hoặc chạm bốn cột theo nhịp."><canvas id="arena"></canvas><div id="center-message"><span>ĐI THEO ÂM NHẠC</span><strong>Sẵn sàng vào nhịp?</strong><p>Bấm <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> hoặc chạm cột</p></div><div class="stage-bottom"><span>♪ PIANO TILES</span><span id="clock">00:00 / 00:48</span></div></div>
-<div class="timeline"><div id="progress"></div></div><div class="transport"><button id="start" class="primary">▶ &nbsp; Bắt đầu chơi</button><button id="pause" disabled>Tạm dừng</button><button id="stop" disabled>Dừng lượt</button><button id="restart" title="Chơi lại từ đầu">↻ Chơi lại</button><span id="note-count">84 NỐT</span></div>
-<div id="status" role="status">Nhạc demo đã sẵn sàng. Đeo tai nghe để cảm nhận nhịp tốt hơn.</div>
-</section>
-<!-- Thiết lập nguồn nhạc và bản đồ nhịp, có thể lưu trên trình duyệt. -->
-<aside><section class="card"><div class="card-title"><h2>Nguồn âm nhạc</h2><span>01</span></div><div class="tabs"><button id="demo-tab" class="selected">◉ &nbsp; Nhạc demo</button><button id="youtube-tab" disabled>▷ &nbsp; YouTube</button></div><p id="analysis-unavailable" class="hint" hidden>Máy chủ phân tích YouTube chưa sẵn sàng. Bạn vẫn có thể chơi nhạc demo.</p><div id="demo-panel"><div class="cover"><div class="vinyl"></div><span>ORBIT<br><b>NEON<br>DRIFT</b><small>ORIGINAL SYNTH LOOP / 120 BPM</small></span></div><div class="track-info"><strong>Neon Drift</strong><span>Âm thanh tổng hợp · 48 giây</span></div></div><div id="youtube-panel" hidden>
-<label for="video-url">Dán link YouTube để tự phân tích</label>
-<div class="input-row"><input id="video-url" placeholder="https://youtube.com/watch?v=…"><button id="load-video">Phân tích</button></div>
-<p class="hint">Chuẩn bị một lần trước khi chơi. Hỗ trợ bài nhạc tối đa 10 phút; lần đầu có thể mất vài phút.</p>
-<!-- Tiến độ phản ánh các giai đoạn thực tế, không dùng thời gian giả lập. -->
-<div id="analysis-panel" hidden><div class="analysis-steps">01 TẢI NHẠC → 02 PHÂN TÍCH → 03 SẴN SÀNG</div><progress id="analysis-progress" max="100" value="0" aria-label="Tiến độ chuẩn bị bài nhạc"></progress><p id="analysis-message" role="status"></p><button id="cancel-prepare" hidden>Hủy chuẩn bị</button></div>
-<strong id="track-title"></strong><a id="original-video" hidden target="_blank" rel="noopener noreferrer">Xem video gốc trên YouTube ↗</a>
-<p class="hint">Khi chơi, âm thanh đã tải được phát trên máy và dùng cùng đồng hồ với nốt. Không cần tự nhập BPM hoặc gõ căn nhịp.</p>
-</div></section>
-<section class="card"><div class="card-title"><h2>Thiết lập nhịp</h2><span>02</span></div><fieldset id="settings"><div class="fields"><label>BPM<input id="bpm" type="number" min="40" max="240" step="0.001" value="120"></label><label>Mốc nhịp (demo)<input id="offset" type="number" min="0" max="3600" step="0.0001" value="2"></label></div><div class="fields"><label>Độ dài (giây)<input id="duration" type="number" min="15" max="600" value="48"></label><label>Độ khó<select id="difficulty"><option value="easy">Dễ · làm quen</option><option value="normal" selected>Vừa · phiêu nhạc</option><option value="hard">Khó · thử thách</option></select></label></div><div class="range-label"><label for="latency">Bù độ trễ</label><output id="latency-value">0 ms</output></div><input id="latency" type="range" min="-300" max="300" step="5" value="0"><p class="hint">YouTube: nốt được tạo từ âm thanh, BPM chỉ để tham khảo. Bù trễ dương làm nốt tới muộn hơn, âm làm nốt tới sớm hơn nếu tai nghe có độ trễ.</p><button id="tap" class="wide">♪ Tap tempo cho demo <span>YouTube được phân tích tự động</span></button></fieldset><div class="save-row"><button id="save">↓ Lưu thiết lập</button><button id="reset">Khôi phục</button></div></section></aside>
-</div>
-<section class="instructions"><div><span class="step">01</span><div><h3>Bốn cột phím đàn</h3><p>Bấm <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> từ trái sang phải, hoặc chạm trực tiếp vào cột.</p></div></div><div><span class="step">02</span><div><h3>Chạm đúng nhịp</h3><p>Bấm khi đáy ô tới vạch sáng. Ô dài: giữ phím hoặc ngón tay đến hết đuôi.</p></div></div><div><span class="step">03</span><div><h3>Tìm dòng chảy</h3><p>Trượt ô hoặc bấm ô trống sẽ mất combo. <kbd>Esc</kbd> để tạm dừng và nghỉ một chút.</p></div></div></section>
-<footer><span>ORBIT LAB © 2026</span><span>Piano Tiles · Bốn cột theo nhịp · Dành cho học tập</span><span>BUILT TO FEEL.</span></footer>
-</main><script type="module" src="app.js"></script></body></html>
+  <!-- Màn hình Loading -->
+  <section id="screen-loading" class="screen screen-loading" aria-label="Đang tải">
+    <div class="loading-box">
+      <div class="app-icon">◉</div>
+      <h1>ORBIT</h1>
+      <div class="loading-bar"><div id="loading-fill"></div></div>
+      <p id="loading-status" role="status">Đang tải…</p>
+    </div>
+  </section>
+
+  <!-- Menu chính kiểu mobile game iPhone -->
+  <section id="screen-menu" class="screen screen-menu" hidden>
+    <div class="menu-shell">
+      <header class="menu-header">
+        <div class="brand"><span class="brand-dot">◉</span><strong>ORBIT</strong></div>
+        <span class="pill-badge">PIANO 3D</span>
+      </header>
+
+      <div class="menu-scroll">
+        <!-- Chọn nguồn nhạc -->
+        <section class="ios-card">
+          <div class="tabs source-tabs" role="tablist" aria-label="Nguồn nhạc">
+            <button id="demo-tab" type="button" class="selected">Demo</button>
+            <button id="local-tab" type="button">Thiết bị</button>
+            <button id="youtube-tab" type="button" disabled>YouTube</button>
+          </div>
+
+          <div id="demo-panel">
+            <div id="demo-list" class="demo-list" role="group" aria-label="Danh sách nhạc demo"></div>
+          </div>
+
+          <div id="local-panel" hidden>
+            <label class="file-drop" for="local-file">
+              <span class="file-icon">♫</span>
+              <strong>Chọn bài hát</strong>
+              <span>MP3, WAV, OGG, FLAC, M4A</span>
+            </label>
+            <input id="local-file" type="file" accept="audio/*" hidden>
+            <div id="local-track-info" class="track-row" hidden>
+              <strong id="local-title"></strong>
+              <span id="local-meta"></span>
+            </div>
+          </div>
+
+          <div id="youtube-panel" hidden>
+            <p id="analysis-unavailable" class="hint" hidden>YouTube chưa khả dụng.</p>
+            <div class="input-row">
+              <input id="video-url" placeholder="Dán link YouTube…">
+              <button id="load-video" type="button">Tải</button>
+            </div>
+            <div id="analysis-panel" hidden>
+              <progress id="analysis-progress" max="100" value="0" aria-label="Tiến độ"></progress>
+              <div class="analysis-row">
+                <p id="analysis-message" role="status"></p>
+                <button id="cancel-prepare" type="button" hidden>Hủy</button>
+              </div>
+            </div>
+            <strong id="track-title"></strong>
+            <a id="original-video" hidden target="_blank" rel="noopener noreferrer">Mở video gốc ↗</a>
+          </div>
+        </section>
+
+        <!-- Độ khó, Chế độ 2D/3D & Bù trễ -->
+        <section class="ios-card" id="settings-panel">
+          <div class="row-head">
+            <span>Độ khó</span>
+            <span id="note-count" class="chip">84 nốt</span>
+          </div>
+          <div class="tabs difficulty-tabs" role="group" aria-label="Độ khó">
+            <button type="button" data-difficulty="easy">Dễ</button>
+            <button type="button" data-difficulty="normal" class="selected">Thường</button>
+            <button type="button" data-difficulty="hard">Khó</button>
+          </div>
+
+          <div class="row-head mode-head">
+            <span>Luật chơi</span>
+          </div>
+          <div class="tabs play-mode-tabs" role="group" aria-label="Luật chơi">
+            <button type="button" data-play-mode="standard" class="selected">Chuẩn</button>
+            <button type="button" data-play-mode="sudden-death">Sinh tồn (Piano Tiles)</button>
+          </div>
+
+          <div class="row-head mode-head">
+            <span>Chế độ hiển thị</span>
+          </div>
+          <div class="tabs mode-tabs" role="group" aria-label="Chế độ hiển thị">
+            <button type="button" data-render-mode="2d" class="selected">2D</button>
+            <button type="button" data-render-mode="3d">3D</button>
+          </div>
+
+          <div class="row-head offset-head">
+            <label for="scroll-speed">Tốc độ rơi</label>
+            <output id="speed-value" for="scroll-speed">1.0×</output>
+          </div>
+          <input id="scroll-speed" type="range" min="0.5" max="2.0" step="0.1" value="1.0">
+
+          <div class="row-head offset-head">
+            <label for="audio-offset">Bù trễ âm thanh</label>
+            <output id="offset-value" for="audio-offset">0 ms</output>
+          </div>
+          <input id="audio-offset" type="range" min="-200" max="200" step="5" value="0">
+
+          <label class="toggle-row" for="hitsound-toggle">
+            <span>Âm thanh gõ phím</span>
+            <input id="hitsound-toggle" type="checkbox" checked>
+          </label>
+        </section>
+
+        <!-- Tay cầm gọn -->
+        <section class="ios-card" id="gamepad-panel">
+          <div class="row-head">
+            <span>Tay cầm</span>
+            <span class="hint" role="status"></span>
+          </div>
+          <fieldset disabled aria-label="Gán nút tay cầm">
+            <div class="fields">
+              <button type="button" data-lane="0">D · —</button>
+              <button type="button" data-lane="1">F · —</button>
+              <button type="button" data-lane="2">J · —</button>
+              <button type="button" data-lane="3">K · —</button>
+            </div>
+            <div class="gamepad-actions">
+              <button type="button" data-cancel hidden>Hủy</button>
+              <button type="button" data-clear>Xóa gán</button>
+            </div>
+          </fieldset>
+        </section>
+      </div>
+
+      <footer class="menu-footer">
+        <p id="menu-status" class="status-line" role="status">Sẵn sàng · D F J K hoặc chạm cột</p>
+        <button id="start" type="button" class="primary start-cta">▶ Chơi ngay</button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Màn hình chơi game Piano Tiles 3D -->
+  <section id="screen-game" class="screen screen-game" hidden>
+    <div class="timeline"><div id="progress"></div></div>
+
+    <header class="game-hud">
+      <div class="hud-track">
+        <strong id="game-title">NEON DRIFT</strong>
+        <small id="game-meta">THƯỜNG</small>
+      </div>
+      <div class="hud-stats">
+        <div><small>ĐIỂM</small><strong id="score">000000</strong></div>
+        <div><small>COMBO</small><strong id="combo"><b id="combo-value">0</b><span>×</span></strong></div>
+        <div><small>CHUẨN</small><strong id="accuracy">—</strong></div>
+      </div>
+      <button id="pause" type="button" class="hud-pause" aria-label="Tạm dừng">⏸</button>
+    </header>
+
+    <div class="stage" tabindex="0" aria-label="Sân chơi Piano Tiles">
+      <canvas id="arena-2d"></canvas>
+      <canvas id="arena-3d" hidden></canvas>
+      <div id="stage-hud" aria-hidden="true">
+        <span id="countdown" hidden></span>
+        <span id="judge-feedback" hidden></span>
+      </div>
+      <div class="stage-bottom">
+        <span id="clock">00:00 / 00:48</span>
+      </div>
+    </div>
+
+    <!-- Menu tạm dừng -->
+    <div id="pause-overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+      <div class="overlay-card">
+        <h2 id="pause-title">Tạm dừng</h2>
+        <p id="pause-subtitle">NEON DRIFT</p>
+        <div class="overlay-actions">
+          <button id="resume-btn" type="button" class="primary">▶ Tiếp tục</button>
+          <button id="restart-btn" type="button">↻ Chơi lại</button>
+          <button id="menu-btn" type="button">Menu chính</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kết thúc lượt -->
+    <div id="result-overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+      <div class="overlay-card">
+        <h2 id="result-title">Hoàn thành</h2>
+        <div class="result-rank-row">
+          <span id="result-rank" class="result-rank-badge">S</span>
+          <span id="result-stars" class="result-stars">★★★</span>
+          <span id="result-new-record" class="new-record-badge" hidden>Kỷ lục mới!</span>
+        </div>
+        <div class="result-stats">
+          <div><small>ĐIỂM</small><strong id="result-score">0</strong></div>
+          <div><small>COMBO</small><strong id="result-combo">0×</strong></div>
+          <div><small>CHUẨN</small><strong id="result-accuracy">0%</strong></div>
+        </div>
+        <div class="overlay-actions">
+          <button id="result-restart-btn" type="button" class="primary">↻ Chơi lại</button>
+          <button id="result-menu-btn" type="button">Menu chính</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

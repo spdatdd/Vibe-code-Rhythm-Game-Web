@@ -45,6 +45,25 @@ class AnalysisTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 analyze(wav)
 
+    def test_native_22050_mono(self):
+        """Đường phân tích trực tiếp 22.05 kHz mono không cần resample vẫn giữ đúng onset."""
+        sr = 22050
+        times = [.6, 1.1, 1.6, 2.1, 2.6, 3.1, 3.6, 4.1, 4.6, 5.1]
+        y = np.zeros(sr * 7, dtype=np.float32)
+        for onset in times:
+            t = np.arange(int(sr * .18)) / sr
+            tone = .7 * np.minimum(1, t / .004) * np.exp(-t * 20) * np.sin(2 * np.pi * 330 * t)
+            start = int(onset * sr)
+            y[start:start + len(t)] += tone
+        with tempfile.TemporaryDirectory() as directory:
+            wav = Path(directory) / 'mono22k.wav'
+            sf.write(wav, y, sr, subtype='PCM_16')
+            result = analyze(wav)
+        found = [event['time'] for event in result['events']]
+        errors = [min(abs(point - onset) for point in found) for onset in times]
+        self.assertLess(max(errors), .05)
+        self.assertEqual(result['sampleRate'], 22050)
+
 
 if __name__ == '__main__':
     unittest.main()

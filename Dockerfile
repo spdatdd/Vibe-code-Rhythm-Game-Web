@@ -10,6 +10,7 @@ COPY analysis/requirements.txt analysis/requirements.txt
 RUN pip install --no-cache-dir -r analysis/requirements.txt
 RUN useradd --system --create-home orbit && mkdir /app/.cache && chown orbit /app/.cache
 COPY package.json server.mjs ./
+COPY server/ server/
 COPY analysis/ analysis/
 COPY public/ public/
 USER orbit

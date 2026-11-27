@@ -31,7 +31,7 @@ export default async function handleRequest(request) {
     return json({ youtubeAnalysis: configured });
   }
 
-  const track = /^\/api\/tracks\/[\w-]{11}(?:\/(result|audio))?$/.exec(url.pathname);
+  const track = /^\/api\/tracks\/[\w-]{11}(?:\/(result|audio|video))?$/.exec(url.pathname);
   const prepare = url.pathname === '/api/prepare' && request.method === 'POST';
   const trackRequest = track && (['GET', 'HEAD'].includes(request.method) ||
     (request.method === 'DELETE' && !track[1]));
@@ -44,7 +44,7 @@ export default async function handleRequest(request) {
     if (value) headers.set(name, value);
   }
 
-  // Giới hạn thời gian chờ header, sau đó chuyển WAV dạng luồng và giữ nguyên thông tin Range.
+  // Giới hạn thời gian chờ header rồi chuyển âm thanh hoặc video dạng luồng, giữ nguyên Range.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   try {
@@ -61,7 +61,7 @@ export default async function handleRequest(request) {
     }
     const contentType = upstream.headers.get('content-type') || '';
     if ([502, 503, 504].includes(upstream.status) ||
-        (!/^(application\/json|audio\/wav)\b/i.test(contentType) && upstream.status !== 416)) {
+        (!/^(application\/json|audio\/(wav|mpeg|flac|mp4|ogg)|video\/mp4)\b/i.test(contentType) && upstream.status !== 416)) {
       await upstream.body?.cancel();
       return json({ error: 'Máy chủ phân tích đang khởi động hoặc tạm thời chưa phản hồi.', code: 'BACKEND_STARTING' }, 503);
     }

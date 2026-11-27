@@ -4,7 +4,8 @@ services:
     name: orbit-rhythm-analysis
     runtime: docker
     plan: free
-    branch: deverlop1
+    # Đổi sang nhánh bạn muốn Render tự động deploy (mặc định: main).
+    branch: main
     healthCheckPath: /healthz
     envVars:
       - key: ORBIT_HOSTED
