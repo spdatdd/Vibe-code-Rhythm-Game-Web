@@ -11,7 +11,6 @@ import {
   PAD_HEIGHT,
 } from '../stage3d.js';
 
-const GRID_STEP_Z = 3.0;
 const NOTE_DEPTH = 1.68;
 const NOTE_HEIGHT = 0.32;
 const HOLD_HEIGHT = 0.15;
@@ -64,18 +63,6 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
     );
     rail.position.set(-RUNWAY_HALF_WIDTH + i * LANE_WIDTH, 0.006, runwayCenterZ);
     scene.add(rail);
-  }
-
-  // Các vạch nhịp ngang chạy dọc theo trục Z.
-  const gridBars = [];
-  const gridCount = Math.ceil(runwayLength / GRID_STEP_Z) + 1;
-  const gridGeom = new THREE.BoxGeometry(RUNWAY_HALF_WIDTH * 2, 0.006, 0.03);
-  const gridMat = new THREE.MeshBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.55 });
-  for (let i = 0; i < gridCount; i++) {
-    const bar = new THREE.Mesh(gridGeom, gridMat);
-    bar.position.y = 0.003;
-    scene.add(bar);
-    gridBars.push(bar);
   }
 
   // Vạch đánh nổi bật tại z = 0.
@@ -281,14 +268,6 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
         pad.mat.color.setHex(0xffffff);
         pad.mat.emissive.setHex(0x000000);
       }
-    }
-
-    // Di chuyển vạch nhịp dọc theo trục Z theo đồng hồ âm thanh.
-    const motion = ((time * speedZ) % GRID_STEP_Z + GRID_STEP_Z) % GRID_STEP_Z;
-    for (let i = 0; i < gridBars.length; i++) {
-      const z = FAR_Z + motion + i * GRID_STEP_Z;
-      gridBars[i].visible = z <= NEAR_Z;
-      gridBars[i].position.z = z;
     }
 
     // Cập nhật vị trí các nốt đang hiển thị trong tầm nhìn camera.

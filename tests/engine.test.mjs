@@ -10,7 +10,7 @@ import {
   clampOffsetMs,
   clampScrollSpeed,
   normalizeDifficulty,
-  normalizeRenderMode,
+  renderModeForViewport,
   loadSettings,
   saveSettings,
   loadRecords,
@@ -162,8 +162,9 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
   assert.equal(normalizeDifficulty('hard'), 'hard');
   assert.equal(normalizeDifficulty('easy'), 'normal');
   assert.equal(normalizeDifficulty('unknown'), 'normal');
-  assert.equal(normalizeRenderMode('3d'), '3d');
-  assert.equal(normalizeRenderMode('invalid'), '2d');
+  assert.equal(renderModeForViewport(390, 844), '2d');
+  assert.equal(renderModeForViewport(600, 600), '2d');
+  assert.equal(renderModeForViewport(844, 390), '3d');
   assert.equal(clampScrollSpeed(3.5), 2.0);
   assert.equal(clampScrollSpeed(0.1), 0.5);
   assert.equal(clampScrollSpeed(1.24), 1.2);
@@ -176,21 +177,19 @@ test('Lưu và đọc cấu hình độ khó, bù trễ âm thanh an toàn', () 
     setItem: (key, value) => store.set(key, value),
   };
   assert.equal(
-    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'hard', audioOffsetMs: 35, renderMode: '3d', scrollSpeed: 1.4 }, mockStorage),
+    saveSettings({ url: ' https://youtu.be/abcdefghijk ', difficulty: 'hard', audioOffsetMs: 35, scrollSpeed: 1.4 }, mockStorage),
     true,
   );
   assert.deepEqual(loadSettings(mockStorage), {
     url: 'https://youtu.be/abcdefghijk',
     difficulty: 'hard',
     audioOffsetMs: 35,
-    renderMode: '3d',
     scrollSpeed: 1.4,
   });
   assert.deepEqual(loadSettings({ getItem: () => '{broken' }), {
     url: '',
     difficulty: 'normal',
     audioOffsetMs: 0,
-    renderMode: '2d',
     scrollSpeed: 1.0,
   });
 });

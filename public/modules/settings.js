@@ -1,16 +1,15 @@
 const STORAGE_KEY = 'orbit-settings-v1';
 const RECORDS_KEY = 'orbit-records-v1';
 const DIFFICULTIES = ['normal', 'hard'];
-const RENDER_MODES = ['2d', '3d'];
 
 /** Chuẩn hóa độ khó về một trong hai mức hợp lệ. */
 export function normalizeDifficulty(value) {
   return DIFFICULTIES.includes(value) ? value : 'normal';
 }
 
-/** Chuẩn hóa chế độ hiển thị, mặc định là 2D. */
-export function normalizeRenderMode(value) {
-  return RENDER_MODES.includes(value) ? value : '2d';
+/** Mặc định chế độ 2D; tự chuyển sang 3D khi ở màn hình ngang. */
+export function renderModeForViewport(width, height) {
+  return Number(width) > Number(height) ? '3d' : '2d';
 }
 
 /** Giới hạn tốc độ rơi của nốt trong khoảng [0.5, 2.0] theo bước 0.1. */
@@ -31,7 +30,6 @@ export function loadSettings(storage = globalThis.localStorage) {
     url: '',
     difficulty: 'normal',
     audioOffsetMs: 0,
-    renderMode: '2d',
     scrollSpeed: 1.0,
   };
   try {
@@ -41,7 +39,6 @@ export function loadSettings(storage = globalThis.localStorage) {
       url: typeof saved.url === 'string' ? saved.url : '',
       difficulty: normalizeDifficulty(saved.difficulty),
       audioOffsetMs: Number.isFinite(saved.audioOffsetMs) ? clampOffsetMs(saved.audioOffsetMs) : 0,
-      renderMode: normalizeRenderMode(saved.renderMode),
       scrollSpeed: Number.isFinite(saved.scrollSpeed) ? clampScrollSpeed(saved.scrollSpeed) : 1.0,
     };
   } catch {
@@ -56,7 +53,6 @@ export function saveSettings(settings, storage = globalThis.localStorage) {
       url: typeof settings.url === 'string' ? settings.url.trim() : '',
       difficulty: normalizeDifficulty(settings.difficulty),
       audioOffsetMs: clampOffsetMs(settings.audioOffsetMs),
-      renderMode: normalizeRenderMode(settings.renderMode),
       scrollSpeed: clampScrollSpeed(settings.scrollSpeed ?? 1.0),
     }));
     return true;

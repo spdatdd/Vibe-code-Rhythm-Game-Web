@@ -5,7 +5,7 @@ import {
   clampOffsetMs,
   clampScrollSpeed,
   normalizeDifficulty,
-  normalizeRenderMode,
+  renderModeForViewport,
   loadRecords,
   saveRecord,
 } from './modules/settings.js';
@@ -21,7 +21,6 @@ const stage = document.querySelector('.stage');
 const canvas2d = $('arena-2d');
 const canvas3d = $('arena-3d');
 const difficultyButtons = [...document.querySelectorAll('[data-difficulty]')];
-const renderModeButtons = [...document.querySelectorAll('[data-render-mode]')];
 const colors = ['#007aff', '#af52de', '#ff9500', '#10b981'];
 const laneLabels = ['D', 'F', 'J', 'K'];
 const activeHolds = new Map();
@@ -73,7 +72,6 @@ function persistSettings() {
     url: $('video-url').value,
     difficulty,
     audioOffsetMs,
-    renderMode,
     scrollSpeed,
   });
 }
@@ -123,7 +121,6 @@ function setMode(next) {
   const active = ['playing', 'paused', 'waiting'].includes(mode);
   const preparing = mode === 'preparing';
   for (const button of difficultyButtons) button.disabled = active || preparing;
-  for (const button of renderModeButtons) button.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
   for (const id of ['local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
   $('youtube-tab').disabled ||= !analysisAvailable;
@@ -370,13 +367,10 @@ function setScrollSpeed(value) {
   $('speed-value').textContent = `${scrollSpeed.toFixed(1)}×`;
 }
 
-function selectRenderMode(next) {
-  if (!['2d', '3d'].includes(next) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
-  renderMode = normalizeRenderMode(next);
-  for (const button of renderModeButtons) button.classList.toggle('selected', button.dataset.renderMode === renderMode);
+function syncViewportRenderMode() {
+  renderMode = renderModeForViewport(window.innerWidth, window.innerHeight);
   canvas2d.hidden = renderMode !== '2d';
   canvas3d.hidden = renderMode !== '3d';
-  persistSettings();
 }
 
 function setAudioOffset(value) {
@@ -431,7 +425,8 @@ $('cancel-prepare').addEventListener('click', cancelPreparation);
 $('audio-offset').addEventListener('input', event => { setAudioOffset(event.target.value); persistSettings(); });
 $('scroll-speed').addEventListener('input', event => { setScrollSpeed(event.target.value); persistSettings(); });
 for (const button of difficultyButtons) button.addEventListener('click', () => selectDifficulty(button.dataset.difficulty));
-for (const button of renderModeButtons) button.addEventListener('click', () => selectRenderMode(button.dataset.renderMode));
+window.addEventListener('resize', syncViewportRenderMode);
+window.addEventListener('orientationchange', syncViewportRenderMode);
 $('video-url').addEventListener('input', () => {
   clearTimeout(pasteTimer); prepared = null; musicBuffer = null; loadedId = ''; setMode('idle'); resetRound();
   $('track-title').textContent = ''; $('original-video').hidden = true;
@@ -453,7 +448,7 @@ const saved = loadSettings();
 $('video-url').value = saved.url;
 difficulty = saved.difficulty;
 for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
-selectRenderMode(saved.renderMode);
+syncViewportRenderMode();
 setScrollSpeed(saved.scrollSpeed);
 setAudioOffset(saved.audioOffsetMs);
 

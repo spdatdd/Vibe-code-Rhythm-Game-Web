@@ -63,5 +63,14 @@ export function setupInputs({ stage, laneKeys, getRenderMode, isBlocked, onStrik
     keys.delete(event.code);
   });
 
+  // Tắt chọn chữ, menu chuột phải/nhấn giữ và copy/paste trong game (trừ ô nhập link).
+  for (const type of ['copy', 'cut', 'paste', 'selectstart', 'contextmenu']) {
+    document.addEventListener(type, event => {
+      if (!event.target.closest('input, textarea')) {
+        event.preventDefault();
+      }
+    });
+  }
+
   return { clear, isLaneHeld };
 }

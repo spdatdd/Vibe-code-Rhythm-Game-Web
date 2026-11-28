@@ -23,15 +23,14 @@
     <div class="menu-shell">
       <header class="menu-header">
         <div class="brand"><span class="brand-dot">◉</span><strong>ORBIT</strong></div>
-        <span class="pill-badge">PIANO 3D</span>
       </header>
 
       <div class="menu-scroll">
         <!-- Chọn nguồn nhạc -->
         <section class="ios-card">
           <div class="tabs source-tabs" role="tablist" aria-label="Nguồn nhạc">
-            <button id="local-tab" type="button" class="selected">Thiết bị</button>
-            <button id="youtube-tab" type="button" disabled>YouTube</button>
+            <button id="local-tab" type="button" class="selected"><span class="tab-ico">♫</span> Thiết bị</button>
+            <button id="youtube-tab" type="button" disabled><span class="tab-ico">▷</span> YouTube</button>
           </div>
 
           <div id="local-panel">
@@ -65,43 +64,33 @@
           </div>
         </section>
 
-        <!-- Độ khó, Chế độ 2D/3D & Bù trễ -->
+        <!-- Độ khó, Tốc độ rơi & Bù trễ (Icon + Chữ) -->
         <section class="ios-card" id="settings-panel">
           <div class="row-head">
-            <span>Độ khó</span>
-            <span id="note-count" class="chip">84 nốt</span>
+            <span class="menu-label"><i class="menu-ico ico-blue">⚡</i> Độ khó</span>
+            <span id="note-count" class="chip">0 nốt</span>
           </div>
           <div class="tabs difficulty-tabs" role="group" aria-label="Độ khó">
             <button type="button" data-difficulty="normal" class="selected">Thường</button>
             <button type="button" data-difficulty="hard">Khó</button>
           </div>
 
-          <div class="row-head mode-head">
-            <span>Chế độ hiển thị</span>
-          </div>
-          <div class="tabs mode-tabs" role="group" aria-label="Chế độ hiển thị">
-            <button type="button" data-render-mode="2d" class="selected">2D</button>
-            <button type="button" data-render-mode="3d">3D</button>
-          </div>
-
           <div class="row-head offset-head">
-            <label for="scroll-speed">Tốc độ rơi</label>
+            <label class="menu-label" for="scroll-speed"><i class="menu-ico ico-purple">⇣</i> Tốc độ rơi</label>
             <output id="speed-value" for="scroll-speed">1.0×</output>
           </div>
           <input id="scroll-speed" type="range" min="0.5" max="2.0" step="0.1" value="1.0">
 
           <div class="row-head offset-head">
-            <label for="audio-offset">Bù trễ âm thanh</label>
+            <label class="menu-label" for="audio-offset"><i class="menu-ico ico-green">🎧</i> Bù trễ</label>
             <output id="offset-value" for="audio-offset">0 ms</output>
           </div>
           <input id="audio-offset" type="range" min="-200" max="200" step="5" value="0">
+
+          <button id="start" type="button" class="primary start-cta">▶ Chơi ngay</button>
+          <p id="menu-status" class="status-line" role="status"></p>
         </section>
       </div>
-
-      <footer class="menu-footer">
-        <p id="menu-status" class="status-line" role="status">Sẵn sàng · D F J K hoặc chạm cột</p>
-        <button id="start" type="button" class="primary start-cta">▶ Chơi ngay</button>
-      </footer>
     </div>
   </section>
 

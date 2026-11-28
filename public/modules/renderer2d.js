@@ -1,13 +1,15 @@
 const PIXELS_PER_SECOND = 460;
-const NOTE_HEIGHT = 114;
 
 /** Tính khung 4 cột Piano Tiles 2D căn giữa theo kích thước màn hình. */
 export function getLayout2D(width, height) {
   const boardWidth = Math.min(Math.max(width - 16, 220), 520);
   const left = (width - boardWidth) / 2;
   const laneWidth = boardWidth / 4;
-  const hitY = Math.max(120, height - 124);
-  return { width, height, left, boardWidth, laneWidth, hitY };
+  const padHeight = Math.max(48, Math.round(height * 0.25));
+  const noteHeight = padHeight;
+  const hitY = Math.max(120, height - padHeight - 22);
+  const padTop = hitY + 10;
+  return { width, height, left, boardWidth, laneWidth, hitY, padTop, padHeight, noteHeight };
 }
 
 /** Xác định cột chạm từ tọa độ 2D trên sân chơi Piano Tiles. */
@@ -49,10 +51,10 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const { left, boardWidth, laneWidth, hitY } = getLayout2D(w, h);
+    const { left, boardWidth, laneWidth, hitY, padTop, padHeight, noteHeight } = getLayout2D(w, h);
     const now = performance.now();
 
-    // Nền 4 cột đàn sáng.
+    // Nền 4 cột đàn sáng; chỉ làm nổi cột đang được nhấn.
     for (let lane = 0; lane < 4; lane++) {
       const x = left + lane * laneWidth;
       const held = isHeld(lane);
@@ -65,16 +67,6 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
     ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(left + boardWidth - 1, 0, 1, h);
 
-    // Đường kẻ nhịp ngang cuộn xuống theo thời gian.
-    const beatStep = 140;
-    const motion = ((time * speed) % beatStep + beatStep) % beatStep;
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
-    for (let y = motion - beatStep; y < hitY; y += beatStep) {
-      if (y >= 0) ctx.fillRect(left, y, boardWidth, 1);
-    }
-
-    const padTop = hitY + 10;
-    const padHeight = Math.max(60, Math.min(102, h - padTop - 12));
     const holdingLanes = new Set();
 
     // Các khối nốt rơi thẳng từ trên xuống vạch đánh.
@@ -87,7 +79,7 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
       const bottomY = isHolding ? hitY : hitY - (note.time - time) * speed;
       const remainingHold = note.hold ? (isHolding ? Math.max(0, note.time + note.hold - time) : note.hold) : 0;
       const holdHeight = remainingHold * speed;
-      const topY = (isHolding ? hitY : bottomY - NOTE_HEIGHT) - holdHeight;
+      const topY = (isHolding ? hitY : bottomY - noteHeight) - holdHeight;
       if (bottomY < -20 || topY > h + 20) continue;
 
       const x = left + note.lane * laneWidth + 3;
@@ -95,7 +87,7 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
       const color = colors[note.lane];
 
       if (note.hold && holdHeight > 2) {
-        const tailBottomY = isHolding ? padTop + 6 : bottomY - NOTE_HEIGHT + 8;
+        const tailBottomY = isHolding ? padTop + 6 : bottomY - noteHeight + 8;
         if (tailBottomY > topY) {
           ctx.save();
           ctx.globalAlpha = 0.42;
@@ -110,7 +102,7 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
       if (!isHolding) {
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(x, bottomY - NOTE_HEIGHT, noteW, NOTE_HEIGHT, 10);
+        ctx.roundRect(x, bottomY - noteHeight, noteW, noteHeight, 10);
         ctx.fill();
       }
     }
