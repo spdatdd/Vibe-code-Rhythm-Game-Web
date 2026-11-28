@@ -1,4 +1,4 @@
-import { LANE_KEYS, calculateRank, videoId, judge, award, findNote, buildAnalyzedChart } from './engine.js';
+import { LANE_KEYS, calculateRank, judge, award, findNote, buildAnalyzedChart } from './engine.js';
 import {
   loadSettings,
   saveSettings,
@@ -11,7 +11,6 @@ import {
 } from './modules/settings.js';
 import { createAudioEngine } from './modules/audio.js';
 import { analyzeAudioBufferAsync } from './modules/local-analyzer.js';
-import { checkAnalysisSupport, prepareTrack, cancelTrackPreparation } from './modules/youtube-client.js';
 import { createRenderer } from './modules/renderer.js';
 import { createRenderer2D } from './modules/renderer2d.js';
 import { setupInputs } from './modules/input.js';
@@ -28,9 +27,7 @@ const MAX_MISSES = 5;
 const RESUME_DELAY_MS = 3000;
 
 let difficulty = 'normal', renderMode = '2d', scrollSpeed = 1.0, audioOffsetMs = 0;
-let source = 'local', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
 let localTrack = null, localBuffer = null;
-let prepareVersion = 0, prepareAbort = null, pasteTimer = null;
 let screen = 'loading', mode = 'idle', chart = [], duration = 0, stats, anchor = 0, elapsed = 0;
 let nextMissIndex = 0, resumeGraceUntil = 0, resumeUntil = 0, skipIntroCountdown = false, feedback = '', feedbackUntil = 0;
 
@@ -70,7 +67,6 @@ function formatTime(t) { return `${String(Math.floor(t / 60)).padStart(2, '0')}:
 function setStatus(message) { $('menu-status').textContent = message; }
 function persistSettings() {
   saveSettings({
-    url: $('video-url').value,
     difficulty,
     audioOffsetMs,
     scrollSpeed,
@@ -78,8 +74,7 @@ function persistSettings() {
 }
 
 function getRecordKey() {
-  const trackKey = source === 'local' ? (localTrack?.title || 'local') : (loadedId || 'youtube');
-  return `${source}:${trackKey}:${difficulty}`;
+  return `local:${localTrack?.title || 'local'}:${difficulty}`;
 }
 function time() { return mode === 'playing' ? audio.outputClock() - anchor - audioOffsetMs / 1000 : elapsed; }
 function missWindow() { return Math.max(0.22, 0.36 / scrollSpeed); }
@@ -93,9 +88,7 @@ function showScreen(next) {
 }
 
 function activePrepared() {
-  if (source === 'local') return localTrack && localBuffer ? { data: localTrack, buffer: localBuffer } : null;
-  if (source === 'youtube') return prepared && musicBuffer ? { data: prepared, buffer: musicBuffer } : null;
-  return null;
+  return localTrack && localBuffer ? { data: localTrack, buffer: localBuffer } : null;
 }
 
 function updateScore() {
@@ -124,20 +117,14 @@ function setMode(next) {
   const preparing = mode === 'preparing';
   for (const button of difficultyButtons) button.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
-  for (const id of ['local-tab', 'youtube-tab', 'load-video', 'video-url']) $(id).disabled = active || preparing;
-  $('youtube-tab').disabled ||= !analysisAvailable;
   $('start').disabled = active || preparing || !activePrepared();
-  $('cancel-prepare').hidden = !preparing;
   $('pause-overlay').hidden = mode !== 'paused';
   $('result-overlay').hidden = mode !== 'ended';
 }
 
 function updateGameHeader() {
   const diffLabel = { normal: 'THƯỜNG', hard: 'KHÓ' }[difficulty] || 'THƯỜNG';
-  const title = source === 'local'
-    ? (localTrack?.title || 'NHẠC THIẾT BỊ')
-    : (prepared?.title || 'YOUTUBE');
-  $('game-title').textContent = title;
+  $('game-title').textContent = localTrack?.title || 'NHẠC THIẾT BỊ';
   $('game-meta').textContent = `${diffLabel} · ${chart.length} NỐT`;
 }
 
@@ -145,7 +132,7 @@ async function start() {
   if (['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   const custom = activePrepared();
   if (!custom) {
-    setStatus(source === 'local' ? 'Hãy chọn một tệp nhạc từ thiết bị trước khi chơi.' : 'Hãy phân tích bài nhạc YouTube trước khi chơi.');
+    setStatus('Hãy chọn một tệp nhạc từ thiết bị trước khi chơi.');
     return;
   }
   resetRound();
@@ -306,64 +293,6 @@ async function handleLocalFile(file) {
   }
 }
 
-function showPreparation(progress, message) {
-  $('analysis-panel').hidden = false;
-  $('analysis-progress').value = progress;
-  $('analysis-message').textContent = message;
-  setStatus(message);
-}
-
-async function loadVideo() {
-  if (['preparing', 'playing', 'paused', 'waiting', 'resuming'].includes(mode)) return;
-  clearTimeout(pasteTimer);
-  const id = videoId($('video-url').value);
-  if (!id) { setStatus('Dán một link YouTube hợp lệ.'); return; }
-  loadedId = id; prepared = null; musicBuffer = null;
-  const version = ++prepareVersion;
-  prepareAbort?.abort(); prepareAbort = new AbortController();
-  setMode('preparing'); resetRound();
-  showPreparation(1, 'Đang gửi bài nhạc tới công cụ phân tích…');
-  try {
-    const { result, buffer } = await prepareTrack(id, {
-      signal: prepareAbort.signal,
-      onProgress: (p, msg) => { if (version === prepareVersion) showPreparation(p, msg); },
-      decodeAudio: bytes => audio.decode(bytes),
-    });
-    if (version !== prepareVersion) return;
-    prepared = result; musicBuffer = buffer; persistSettings();
-    $('track-title').textContent = result.title;
-    $('original-video').href = `https://www.youtube.com/watch?v=${id}`;
-    $('original-video').hidden = false;
-    resetRound(); setMode('idle');
-    showPreparation(100, `Sẵn sàng · ${chart.length} nốt · ${formatTime(result.duration)}`);
-  } catch (error) {
-    if (version !== prepareVersion) return;
-    prepared = null; musicBuffer = null; setMode('idle');
-    showPreparation(0, error.name === 'AbortError' ? 'Đã hủy chuẩn bị.' : `Không chuẩn bị được: ${error.message}`);
-  }
-}
-
-async function cancelPreparation() {
-  const id = loadedId; ++prepareVersion; prepareAbort?.abort();
-  await cancelTrackPreparation(id);
-  prepared = null; musicBuffer = null; setMode('idle');
-  showPreparation(0, 'Đã hủy chuẩn bị. Bạn có thể chọn bài khác.');
-}
-
-function selectSource(next) {
-  if ((next === 'youtube' && !analysisAvailable) || ['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
-  clearTimeout(pasteTimer);
-  source = next;
-  $('local-tab').classList.toggle('selected', next === 'local');
-  $('youtube-tab').classList.toggle('selected', next === 'youtube');
-  $('local-panel').hidden = next !== 'local';
-  $('youtube-panel').hidden = next !== 'youtube';
-  resetRound();
-  setMode('idle');
-  if (next === 'local') setStatus(localTrack ? `Đã nạp "${localTrack.title}".` : 'Chọn tệp nhạc từ thiết bị để tự động tạo bản đồ nốt.');
-  else setStatus(prepared ? `Đã sẵn sàng "${prepared.title}".` : 'Dán link YouTube để phân tích trước khi chơi.');
-}
-
 function selectDifficulty(next) {
   if (!['normal', 'hard'].includes(next) || ['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   difficulty = normalizeDifficulty(next);
@@ -466,20 +395,11 @@ $('restart-btn').addEventListener('click', restartRound);
 $('menu-btn').addEventListener('click', returnToMenu);
 $('result-restart-btn').addEventListener('click', restartRound);
 $('result-menu-btn').addEventListener('click', returnToMenu);
-$('local-tab').addEventListener('click', () => selectSource('local'));
-$('youtube-tab').addEventListener('click', () => selectSource('youtube'));
-$('load-video').addEventListener('click', loadVideo);
-$('cancel-prepare').addEventListener('click', cancelPreparation);
 $('audio-offset').addEventListener('input', event => { setAudioOffset(event.target.value); persistSettings(); });
 $('scroll-speed').addEventListener('input', event => { setScrollSpeed(event.target.value); persistSettings(); });
 for (const button of difficultyButtons) button.addEventListener('click', () => selectDifficulty(button.dataset.difficulty));
 window.addEventListener('resize', syncViewportRenderMode);
 window.addEventListener('orientationchange', syncViewportRenderMode);
-$('video-url').addEventListener('input', () => {
-  clearTimeout(pasteTimer); prepared = null; musicBuffer = null; loadedId = ''; setMode('idle'); resetRound();
-  $('track-title').textContent = ''; $('original-video').hidden = true;
-  if (videoId($('video-url').value)) pasteTimer = setTimeout(loadVideo, 900);
-});
 $('local-file').addEventListener('change', event => { void handleLocalFile(event.target.files?.[0]); });
 
 const dropZone = document.querySelector('.file-drop');
@@ -493,7 +413,6 @@ dropZone.addEventListener('drop', event => {
 
 // Khôi phục thiết lập và chạy màn hình Loading khởi tạo.
 const saved = loadSettings();
-$('video-url').value = saved.url;
 difficulty = saved.difficulty;
 for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
 syncViewportRenderMode();
@@ -504,9 +423,6 @@ async function bootstrap() {
   showScreen('loading');
   $('loading-fill').style.width = '55%';
   $('loading-status').textContent = 'Đang khởi tạo…';
-  analysisAvailable = await checkAnalysisSupport();
-  $('analysis-unavailable').hidden = analysisAvailable;
-  $('youtube-tab').disabled = !analysisAvailable;
   $('loading-fill').style.width = '100%';
   $('loading-status').textContent = 'Sẵn sàng';
   resetRound();

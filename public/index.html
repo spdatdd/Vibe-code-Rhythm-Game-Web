@@ -28,11 +28,6 @@
       <div class="menu-scroll">
         <!-- Chọn nguồn nhạc -->
         <section class="ios-card">
-          <div class="tabs source-tabs" role="tablist" aria-label="Nguồn nhạc">
-            <button id="local-tab" type="button" class="selected"><span class="tab-ico">♫</span> Thiết bị</button>
-            <button id="youtube-tab" type="button" disabled><span class="tab-ico">▷</span> YouTube</button>
-          </div>
-
           <div id="local-panel">
             <label class="file-drop" for="local-file">
               <span class="file-icon">♫</span>
@@ -44,23 +39,6 @@
               <strong id="local-title"></strong>
               <span id="local-meta"></span>
             </div>
-          </div>
-
-          <div id="youtube-panel" hidden>
-            <p id="analysis-unavailable" class="hint" hidden>YouTube chưa khả dụng.</p>
-            <div class="input-row">
-              <input id="video-url" placeholder="Dán link YouTube…">
-              <button id="load-video" type="button">Tải</button>
-            </div>
-            <div id="analysis-panel" hidden>
-              <progress id="analysis-progress" max="100" value="0" aria-label="Tiến độ"></progress>
-              <div class="analysis-row">
-                <p id="analysis-message" role="status"></p>
-                <button id="cancel-prepare" type="button" hidden>Hủy</button>
-              </div>
-            </div>
-            <strong id="track-title"></strong>
-            <a id="original-video" hidden target="_blank" rel="noopener noreferrer">Mở video gốc ↗</a>
           </div>
         </section>
 

@@ -1,7 +1,0 @@
-.git
-.cache
-.tools
-.netlify
-.env*
-**/__pycache__
-*.log

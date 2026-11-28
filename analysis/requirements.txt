@@ -1,3 +1,0 @@
-yt-dlp[default]==2026.10.26
-librosa==1.0.1
-imageio-ffmpeg==0.8.1
