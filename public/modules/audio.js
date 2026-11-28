@@ -1,3 +1,84 @@
+/**
+ * Làm sạch luồng FLAC trước khi đưa vào Web Audio decodeAudioData:
+ * Bỏ thẻ ID3v2 đầu tệp (nếu có) và loại bỏ các khối metadata phụ (như PICTURE lỗi thiếu MIME type
+ * khiến FFmpeg/Chromium báo EncodingError), chỉ giữ khối STREAMINFO chuẩn và toàn bộ khung âm thanh.
+ */
+export function sanitizeFlacBuffer(arrayBuffer) {
+  if (!(arrayBuffer instanceof ArrayBuffer) || arrayBuffer.byteLength < 42) return arrayBuffer;
+  const data = new Uint8Array(arrayBuffer);
+  let offset = 0;
+
+  // Bỏ qua các thẻ ID3v2 ở đầu tệp nếu trình gắn thẻ chèn trước chữ ký "fLaC".
+  while (
+    offset + 10 <= data.length &&
+    data[offset] === 0x49 &&
+    data[offset + 1] === 0x44 &&
+    data[offset + 2] === 0x33 &&
+    data[offset + 3] < 0xff &&
+    data[offset + 4] < 0xff
+  ) {
+    const flags = data[offset + 5];
+    const bodySize =
+      ((data[offset + 6] & 0x7f) << 21) |
+      ((data[offset + 7] & 0x7f) << 14) |
+      ((data[offset + 8] & 0x7f) << 7) |
+      (data[offset + 9] & 0x7f);
+    const footer = flags & 0x10 ? 10 : 0;
+    const nextOffset = offset + 10 + bodySize + footer;
+    if (nextOffset <= offset || nextOffset >= data.length) break;
+    offset = nextOffset;
+    while (offset < data.length && data[offset] === 0x00 && offset < nextOffset + 4096) offset++;
+  }
+
+  if (
+    offset + 42 > data.length ||
+    data[offset] !== 0x66 ||
+    data[offset + 1] !== 0x4c ||
+    data[offset + 2] !== 0x61 ||
+    data[offset + 3] !== 0x43
+  ) {
+    return arrayBuffer;
+  }
+
+  let pos = offset + 4;
+  let streamInfoStart = -1;
+  let audioStart = -1;
+
+  while (pos + 4 <= data.length) {
+    const header = data[pos];
+    const isLast = (header & 0x80) !== 0;
+    const blockType = header & 0x7f;
+    const blockLen = (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3];
+    if (blockType === 127 || pos + 4 + blockLen > data.length) return arrayBuffer;
+    if (blockType === 0) {
+      if (blockLen !== 34) return arrayBuffer;
+      if (streamInfoStart < 0) streamInfoStart = pos + 4;
+    }
+    pos += 4 + blockLen;
+    if (isLast) {
+      audioStart = pos;
+      break;
+    }
+  }
+
+  if (streamInfoStart < 0 || audioStart < 0 || audioStart >= data.length) return arrayBuffer;
+  if (offset === 0 && audioStart === 42) return arrayBuffer;
+
+  const audioLen = data.length - audioStart;
+  const clean = new Uint8Array(42 + audioLen);
+  clean[0] = 0x66;
+  clean[1] = 0x4c;
+  clean[2] = 0x61;
+  clean[3] = 0x43;
+  clean[4] = 0x80; // is_last = 1, block_type = 0 (STREAMINFO)
+  clean[5] = 0x00;
+  clean[6] = 0x00;
+  clean[7] = 0x22; // 34 bytes
+  clean.set(data.subarray(streamInfoStart, streamInfoStart + 34), 8);
+  clean.set(data.subarray(audioStart), 42);
+  return clean.buffer;
+}
+
 /** Quản lý Web Audio: đồng hồ đầu ra, phát AudioBuffer và trích xuất dữ liệu FFT. */
 export function createAudioEngine({ onBufferEnded }) {
   let context = null;
@@ -67,7 +148,7 @@ export function createAudioEngine({ onBufferEnded }) {
 
   async function decode(bytes) {
     const audio = await ensureRunning();
-    return audio.decodeAudioData(bytes);
+    return audio.decodeAudioData(sanitizeFlacBuffer(bytes));
   }
 
   function stopBuffer() {
