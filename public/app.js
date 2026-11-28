@@ -25,13 +25,14 @@ const colors = ['#007aff', '#af52de', '#ff9500', '#10b981'];
 const laneLabels = ['D', 'F', 'J', 'K'];
 const activeHolds = new Map();
 const MAX_MISSES = 5;
+const RESUME_DELAY_MS = 3000;
 
 let difficulty = 'normal', renderMode = '2d', scrollSpeed = 1.0, audioOffsetMs = 0;
 let source = 'local', loadedId = '', prepared = null, musicBuffer = null, analysisAvailable = false;
 let localTrack = null, localBuffer = null;
 let prepareVersion = 0, prepareAbort = null, pasteTimer = null;
 let screen = 'loading', mode = 'idle', chart = [], duration = 0, stats, anchor = 0, elapsed = 0;
-let nextMissIndex = 0, resumeGraceUntil = 0, feedback = '', feedbackUntil = 0;
+let nextMissIndex = 0, resumeGraceUntil = 0, resumeUntil = 0, skipIntroCountdown = false, feedback = '', feedbackUntil = 0;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = createAudioEngine({ onBufferEnded: () => { if (mode === 'playing') finish(); } });
@@ -62,7 +63,7 @@ const inputs = setupInputs({
   getRenderMode: () => renderMode,
   isBlocked: () => screen !== 'game' || mode !== 'playing',
   onStrike: strike,
-  onPause: () => { if (screen === 'game' && ['playing', 'paused'].includes(mode)) togglePause(); },
+  onPause: () => { if (screen === 'game' && ['playing', 'paused', 'resuming'].includes(mode)) void togglePause(); },
 });
 
 function formatTime(t) { return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`; }
@@ -109,8 +110,8 @@ function resetRound() {
   chart = custom
     ? buildAnalyzedChart(custom.data.events, difficulty, duration, { allowChords: difficulty === 'hard' })
     : [];
-  stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0, misses: 0 };
-  elapsed = 0; nextMissIndex = 0; resumeGraceUntil = 0; feedback = '';
+  stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0, misses: 0, perfect: 0, great: 0, good: 0 };
+  elapsed = 0; nextMissIndex = 0; resumeGraceUntil = 0; resumeUntil = 0; skipIntroCountdown = false; feedback = '';
   activeHolds.clear(); inputs.clear(); renderer2d.clearEffects(); renderer3d?.clearEffects();
   $('note-count').textContent = `${chart.length} nốt`;
   $('progress').style.width = '0%';
@@ -119,7 +120,7 @@ function resetRound() {
 
 function setMode(next) {
   mode = next;
-  const active = ['playing', 'paused', 'waiting'].includes(mode);
+  const active = ['playing', 'paused', 'waiting', 'resuming'].includes(mode);
   const preparing = mode === 'preparing';
   for (const button of difficultyButtons) button.disabled = active || preparing;
   $('scroll-speed').disabled = active || preparing;
@@ -141,7 +142,7 @@ function updateGameHeader() {
 }
 
 async function start() {
-  if (['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
+  if (['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   const custom = activePrepared();
   if (!custom) {
     setStatus(source === 'local' ? 'Hãy chọn một tệp nhạc từ thiết bị trước khi chơi.' : 'Hãy phân tích bài nhạc YouTube trước khi chơi.');
@@ -172,14 +173,19 @@ async function togglePause() {
     inputs.clear();
     $('pause-subtitle').textContent = `${$('game-title').textContent} · ${stats.score.toLocaleString('vi-VN')} điểm`;
     setMode('paused');
+  } else if (mode === 'resuming') {
+    resumeUntil = 0;
+    inputs.clear();
+    $('pause-subtitle').textContent = `${$('game-title').textContent} · ${stats.score.toLocaleString('vi-VN')} điểm`;
+    setMode('paused');
   } else if (mode === 'paused') {
     try {
       await audio.ensureRunning();
+      if (mode !== 'paused') return;
       const custom = activePrepared();
       if (!custom) return;
-      anchor = audio.playBuffer(custom.buffer, elapsed);
-      if (activeHolds.size) resumeGraceUntil = performance.now() + 450;
-      setMode('playing');
+      resumeUntil = performance.now() + RESUME_DELAY_MS;
+      setMode('resuming');
       stage.focus();
     } catch {
       setStatus('Không thể tiếp tục âm thanh.');
@@ -206,6 +212,9 @@ function finish(failed = false) {
   $('result-score').textContent = stats.score.toLocaleString('vi-VN');
   $('result-combo').textContent = `${stats.maxCombo}×`;
   $('result-accuracy').textContent = `${acc}%`;
+  $('result-perfect').textContent = String(stats.perfect);
+  $('result-great').textContent = String(stats.great);
+  $('result-good').textContent = String(stats.good);
   setMode('ended');
 }
 
@@ -271,7 +280,7 @@ function strike(lane) {
 }
 
 async function handleLocalFile(file) {
-  if (!file || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
+  if (!file || ['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   setMode('preparing');
   setStatus(`Đang đọc và phân tích "${file.name}"…`);
   try {
@@ -305,7 +314,7 @@ function showPreparation(progress, message) {
 }
 
 async function loadVideo() {
-  if (['preparing', 'playing', 'paused', 'waiting'].includes(mode)) return;
+  if (['preparing', 'playing', 'paused', 'waiting', 'resuming'].includes(mode)) return;
   clearTimeout(pasteTimer);
   const id = videoId($('video-url').value);
   if (!id) { setStatus('Dán một link YouTube hợp lệ.'); return; }
@@ -342,7 +351,7 @@ async function cancelPreparation() {
 }
 
 function selectSource(next) {
-  if ((next === 'youtube' && !analysisAvailable) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
+  if ((next === 'youtube' && !analysisAvailable) || ['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   clearTimeout(pasteTimer);
   source = next;
   $('local-tab').classList.toggle('selected', next === 'local');
@@ -356,7 +365,7 @@ function selectSource(next) {
 }
 
 function selectDifficulty(next) {
-  if (!['normal', 'hard'].includes(next) || ['playing', 'paused', 'waiting', 'preparing'].includes(mode)) return;
+  if (!['normal', 'hard'].includes(next) || ['playing', 'paused', 'waiting', 'resuming', 'preparing'].includes(mode)) return;
   difficulty = normalizeDifficulty(next);
   for (const button of difficultyButtons) button.classList.toggle('selected', button.dataset.difficulty === difficulty);
   persistSettings();
@@ -383,9 +392,23 @@ function setAudioOffset(value) {
 
 function frame() {
   if (screen === 'game') {
+    const now = performance.now();
+    if (mode === 'resuming' && now >= resumeUntil) {
+      const custom = activePrepared();
+      if (custom) {
+        resumeUntil = 0;
+        if (elapsed < 0) skipIntroCountdown = true;
+        anchor = audio.playBuffer(custom.buffer, elapsed);
+        if (activeHolds.size) resumeGraceUntil = now + 450;
+        setMode('playing');
+        stage.focus();
+      } else {
+        returnToMenu();
+      }
+    }
     let t = time();
     if (mode === 'playing') {
-      const inGrace = performance.now() < resumeGraceUntil;
+      const inGrace = now < resumeGraceUntil;
       for (const [lane, holdNote] of activeHolds) {
         if (mode !== 'playing') break;
         if (t >= holdNote.time + holdNote.hold - .07) {
@@ -403,7 +426,24 @@ function frame() {
       }
       if (mode === 'playing' && t >= duration) finish();
     }
-    activeRenderer().draw({ time: t, mode, chart, isHeld: inputs.isLaneHeld, feedback, feedbackUntil, scrollSpeed });
+    let countdown = '';
+    if (mode === 'resuming') {
+      countdown = String(Math.max(1, Math.min(3, Math.ceil((resumeUntil - now) / 1000))));
+    } else if (mode === 'playing' && t < 0 && !skipIntroCountdown) {
+      countdown = String(Math.min(2, Math.ceil(-t)));
+    }
+    const audioData = audio.sampleVisualization();
+    activeRenderer().draw({
+      time: t,
+      mode,
+      chart,
+      isHeld: inputs.isLaneHeld,
+      feedback,
+      feedbackUntil,
+      scrollSpeed,
+      audioData,
+      countdown,
+    });
     $('clock').textContent = `${formatTime(Math.max(0, Math.min(t, duration)))} / ${formatTime(duration)}`;
     $('progress').style.width = `${Math.max(0, Math.min(100, duration ? (t / duration) * 100 : 0))}%`;
   }
@@ -412,7 +452,7 @@ function frame() {
 
 // Sự kiện điều hướng và nguồn nhạc.
 function pauseOnLeave() {
-  if (screen === 'game' && mode === 'playing') togglePause();
+  if (screen === 'game' && (mode === 'playing' || mode === 'resuming')) void togglePause();
   inputs.clear();
 }
 window.addEventListener('blur', pauseOnLeave);

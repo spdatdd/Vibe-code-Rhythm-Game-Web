@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
+import { createBackgroundVisualizer, computeLaneEnergy } from './visualizer.js';
 import {
   createView,
   LANE_WIDTH,
@@ -52,6 +53,24 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
     mesh.position.set(-RUNWAY_HALF_WIDTH + (lane + 0.5) * LANE_WIDTH, 0, runwayCenterZ);
     scene.add(mesh);
   }
+
+  // Lớp trực quan hóa âm thanh trải trên mặt đường băng phía dưới các nốt.
+  const visualizer = createBackgroundVisualizer({ colors });
+  const vizCanvas = document.createElement('canvas');
+  vizCanvas.width = 256;
+  vizCanvas.height = 512;
+  const vizCtx = vizCanvas.getContext('2d');
+  const vizTexture = new THREE.CanvasTexture(vizCanvas);
+  vizTexture.colorSpace = THREE.SRGBColorSpace;
+  const vizPlaneGeom = new THREE.PlaneGeometry(RUNWAY_HALF_WIDTH * 2, runwayLength);
+  vizPlaneGeom.rotateX(-Math.PI / 2);
+  const vizPlane = new THREE.Mesh(
+    vizPlaneGeom,
+    new THREE.MeshBasicMaterial({ map: vizTexture, transparent: true, depthWrite: false }),
+  );
+  vizPlane.position.set(0, 0.003, runwayCenterZ);
+  vizPlane.visible = false;
+  scene.add(vizPlane);
 
   // Đường ray ngăn cách cột mảnh, sắc nét.
   const railGeom = new THREE.BoxGeometry(0.028, 0.012, runwayLength);
@@ -176,6 +195,9 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
 
   function clearEffects() {
     laneEffects.clear();
+    visualizer.reset();
+    vizCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+    vizTexture.needsUpdate = true;
   }
 
   function updateEffects(now) {
@@ -235,7 +257,7 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
   let lastHeight = 0;
   let lastDpr = 0;
 
-  function draw({ time, mode, chart, isHeld, feedback, feedbackUntil, scrollSpeed = 1 }) {
+  function draw({ time, mode, chart, isHeld, feedback, feedbackUntil, scrollSpeed = 1, audioData = null, countdown }) {
     const speedZ = SPEED_Z * scrollSpeed;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -312,13 +334,33 @@ export function createRenderer(canvas, { colors, reducedMotion, countdownEl, fee
     for (let i = usedTails; i < tailPool.length; i++) tailPool[i].visible = false;
 
     const now = performance.now();
+    if (audioData) {
+      vizPlane.visible = true;
+      vizCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+      const laneEnergy = computeLaneEnergy({ chart, time, laneEffects, isHeld, now });
+      visualizer.draw(vizCtx, {
+        x: 0,
+        y: 0,
+        w: vizCanvas.width,
+        h: vizCanvas.height,
+        audio: audioData,
+        laneEnergy,
+        now,
+        reducedMotion: reducedMotion.matches,
+      });
+      vizTexture.needsUpdate = true;
+      hitGlowLight.intensity = 1.1 + (audioData.bass || 0) * 1.4 + Math.max(...laneEnergy) * 0.9;
+    } else {
+      vizPlane.visible = false;
+      hitGlowLight.intensity = 1.1;
+    }
     updateEffects(now);
     renderer.render(scene, camera);
 
     if (countdownEl) {
-      const showCountdown = mode === 'playing' && time < 0;
-      countdownEl.hidden = !showCountdown;
-      if (showCountdown) countdownEl.textContent = String(Math.min(2, Math.ceil(-time)));
+      const text = countdown ?? (mode === 'playing' && time < 0 ? String(Math.min(2, Math.ceil(-time))) : '');
+      countdownEl.hidden = !text;
+      if (text) countdownEl.textContent = text;
     }
     if (feedbackEl) {
       const showFeedback = now < feedbackUntil;

@@ -1,3 +1,5 @@
+import { createBackgroundVisualizer, computeLaneEnergy } from './visualizer.js';
+
 const PIXELS_PER_SECOND = 460;
 
 /** Tính khung 4 cột Piano Tiles 2D căn giữa theo kích thước màn hình. */
@@ -24,6 +26,7 @@ export function laneAt2D(width, height, x, y) {
 export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, feedbackEl }) {
   const ctx = canvas.getContext('2d');
   const laneEffects = new Map();
+  const visualizer = createBackgroundVisualizer({ colors });
 
   function triggerEffect(lane, rating = 'PRESS') {
     laneEffects.set(lane, { started: performance.now(), rating });
@@ -31,9 +34,10 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
 
   function clearEffects() {
     laneEffects.clear();
+    visualizer.reset();
   }
 
-  function draw({ time, mode, chart, isHeld, feedback, feedbackUntil, scrollSpeed = 1 }) {
+  function draw({ time, mode, chart, isHeld, feedback, feedbackUntil, scrollSpeed = 1, audioData = null, countdown }) {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (w < 1 || h < 1) return;
@@ -66,6 +70,19 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
     }
     ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(left + boardWidth - 1, 0, 1, h);
+
+    // Trực quan hóa âm thanh nằm ở lớp nền phía sau các nốt nhạc và đồng bộ theo từng cột.
+    const laneEnergy = computeLaneEnergy({ chart, time, laneEffects, isHeld, now });
+    visualizer.draw(ctx, {
+      x: left,
+      y: 0,
+      w: boardWidth,
+      h: hitY,
+      audio: audioData,
+      laneEnergy,
+      now,
+      reducedMotion: reducedMotion.matches,
+    });
 
     const holdingLanes = new Set();
 
@@ -163,9 +180,9 @@ export function createRenderer2D(canvas, { colors, reducedMotion, countdownEl, f
     }
 
     if (countdownEl) {
-      const showCountdown = mode === 'playing' && time < 0;
-      countdownEl.hidden = !showCountdown;
-      if (showCountdown) countdownEl.textContent = String(Math.min(2, Math.ceil(-time)));
+      const text = countdown ?? (mode === 'playing' && time < 0 ? String(Math.min(2, Math.ceil(-time))) : '');
+      countdownEl.hidden = !text;
+      if (text) countdownEl.textContent = text;
     }
     if (feedbackEl) {
       const showFeedback = now < feedbackUntil;

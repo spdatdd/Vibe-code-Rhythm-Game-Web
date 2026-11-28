@@ -115,10 +115,13 @@ export function findNote(notes, lane, time, lateWindow = .19) {
   }
   return earliest;
 }
-// Cập nhật điểm, combo và tổng trọng số chính xác sau một nốt đã kết thúc.
+// Cập nhật điểm, combo, bộ đếm phán xét và tổng trọng số chính xác sau một nốt đã kết thúc.
 export function award(stats, rating) {
   const weight = { PERFECT: 1, GREAT: .8, GOOD: .5, MISS: 0 }[rating];
   stats.judged++; stats.weight += weight;
+  if (rating === 'PERFECT') stats.perfect = (stats.perfect || 0) + 1;
+  else if (rating === 'GREAT') stats.great = (stats.great || 0) + 1;
+  else if (rating === 'GOOD') stats.good = (stats.good || 0) + 1;
   stats.combo = weight ? stats.combo + 1 : 0;
   stats.maxCombo = Math.max(stats.maxCombo, stats.combo);
   stats.score += Math.round(weight * 1000 * (1 + Math.min(Math.floor(stats.combo / 10), 4) * .25));
