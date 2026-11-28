@@ -58,17 +58,6 @@ export function buildAnalyzedChart(events, difficulty, duration, { allowChords =
   }
   return notes;
 }
-// Đọc ID video hợp lệ từ URL YouTube thông dụng hoặc ID thuần.
-export function videoId(input) {
-  if (/^[\w-]{11}$/.test(input.trim())) return input.trim();
-  try {
-    const url = new URL(input.trim());
-    if (!['https:', 'http:'].includes(url.protocol)) return null;
-    const host = url.hostname.replace(/^www\./, '');
-    const id = host === 'youtu.be' ? url.pathname.slice(1) : ['youtube.com', 'm.youtube.com', 'youtube-nocookie.com'].includes(host) ? (url.searchParams.get('v') || url.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1]) : null;
-    return /^[\w-]{11}$/.test(id || '') ? id : null;
-  } catch { return null; }
-}
 // Sinh bản đồ nốt xác định theo BPM; chừa khoảng trống sau nốt giữ.
 export function makeChart({ bpm, offset, duration, difficulty }) {
   const beat = 60 / bpm;

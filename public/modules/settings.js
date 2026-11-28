@@ -27,7 +27,6 @@ export function clampOffsetMs(value) {
 /** Đọc cấu hình đã lưu trong trình duyệt một cách an toàn. */
 export function loadSettings(storage = globalThis.localStorage) {
   const defaults = {
-    url: '',
     difficulty: 'normal',
     audioOffsetMs: 0,
     scrollSpeed: 1.0,
@@ -36,7 +35,6 @@ export function loadSettings(storage = globalThis.localStorage) {
     const saved = JSON.parse(storage?.getItem(STORAGE_KEY) || 'null');
     if (!saved || typeof saved !== 'object') return defaults;
     return {
-      url: typeof saved.url === 'string' ? saved.url : '',
       difficulty: normalizeDifficulty(saved.difficulty),
       audioOffsetMs: Number.isFinite(saved.audioOffsetMs) ? clampOffsetMs(saved.audioOffsetMs) : 0,
       scrollSpeed: Number.isFinite(saved.scrollSpeed) ? clampScrollSpeed(saved.scrollSpeed) : 1.0,
@@ -50,7 +48,6 @@ export function loadSettings(storage = globalThis.localStorage) {
 export function saveSettings(settings, storage = globalThis.localStorage) {
   try {
     storage?.setItem(STORAGE_KEY, JSON.stringify({
-      url: typeof settings.url === 'string' ? settings.url.trim() : '',
       difficulty: normalizeDifficulty(settings.difficulty),
       audioOffsetMs: clampOffsetMs(settings.audioOffsetMs),
       scrollSpeed: clampScrollSpeed(settings.scrollSpeed ?? 1.0),
