@@ -100,12 +100,16 @@ export function calibrateBeats(times) {
   return { bpm: Number(bpm.toFixed(3)), offset: Number(((origin % beat + beat) % beat).toFixed(4)) };
 }
 // Phân loại độ lệch thời gian theo cửa sổ chấm điểm tính bằng giây.
-export function judge(delta) { const d = Math.abs(delta); return d <= .065 ? 'PERFECT' : d <= .13 ? 'GREAT' : d <= .19 ? 'GOOD' : null; }
+export function judge(delta, lateWindow = .19) {
+  if (delta < -.19 || delta > lateWindow) return null;
+  const d = Math.abs(delta);
+  return d <= .065 ? 'PERFECT' : d <= .13 ? 'GREAT' : 'GOOD';
+}
 // Tìm nốt pending sớm nhất trong đúng cột và nằm trong cửa sổ chấm điểm.
-export function findNote(notes, lane, time) {
+export function findNote(notes, lane, time, lateWindow = .19) {
   let earliest;
   for (const note of notes) {
-    if (note.state === 'pending' && note.lane === lane && judge(time - note.time)) {
+    if (note.state === 'pending' && note.lane === lane && judge(time - note.time, lateWindow)) {
       if (!earliest || note.time < earliest.time) earliest = note;
     }
   }

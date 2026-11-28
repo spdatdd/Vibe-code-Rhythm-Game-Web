@@ -81,6 +81,7 @@ function getRecordKey() {
   return `${source}:${trackKey}:${difficulty}`;
 }
 function time() { return mode === 'playing' ? audio.outputClock() - anchor - audioOffsetMs / 1000 : elapsed; }
+function missWindow() { return Math.max(0.22, 0.36 / scrollSpeed); }
 
 /** Chuyển đổi giữa các màn hình: loading, menu và game. */
 function showScreen(next) {
@@ -246,7 +247,8 @@ function strike(lane) {
   if (screen !== 'game' || mode !== 'playing') return;
   const t = time();
   if (activeHolds.has(lane)) return;
-  const note = findNote(chart, lane, t);
+  const lateWindow = missWindow();
+  const note = findNote(chart, lane, t, lateWindow);
   if (!note) {
     activeRenderer().triggerEffect(lane, 'MISS');
     award(stats, 'MISS');
@@ -257,7 +259,7 @@ function strike(lane) {
     handleMiss();
     return;
   }
-  const rating = judge(t - note.time);
+  const rating = judge(t - note.time, lateWindow);
   if (note.hold) {
     note.state = 'holding';
     note.rating = rating;
@@ -386,10 +388,16 @@ function frame() {
       const inGrace = performance.now() < resumeGraceUntil;
       for (const [lane, holdNote] of activeHolds) {
         if (mode !== 'playing') break;
-        if (t >= holdNote.time + holdNote.hold - .07) { activeHolds.delete(lane); resolve(holdNote, holdNote.rating); }
-        else if (!inputs.isLaneHeld(lane) && !inGrace) { activeHolds.delete(lane); resolve(holdNote, 'MISS'); }
+        if (t >= holdNote.time + holdNote.hold - .07) {
+          activeHolds.delete(lane);
+          resolve(holdNote, 'PERFECT');
+        } else if (!inputs.isLaneHeld(lane) && !inGrace) {
+          activeHolds.delete(lane);
+          resolve(holdNote, holdNote.rating === 'PERFECT' ? 'GREAT' : holdNote.rating);
+        }
       }
-      while (mode === 'playing' && nextMissIndex < chart.length && chart[nextMissIndex].time + .19 < t) {
+      const missDelay = missWindow();
+      while (mode === 'playing' && nextMissIndex < chart.length && chart[nextMissIndex].time + missDelay < t) {
         if (chart[nextMissIndex].state === 'pending') resolve(chart[nextMissIndex], 'MISS');
         nextMissIndex++;
       }
